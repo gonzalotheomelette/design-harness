@@ -143,7 +143,8 @@ rules or its model change.
   own dependencies float, and Impeccable downloads a binary on first use.
 - Copy behind a translation call or a prop: the copy check lists those slots for the reviewer instead of measuring
   them.
-- Copy length in Vue, Svelte and Astro files: the check names them instead of measuring them.
+- Copy in markup other than JSX, HTML, Vue, Svelte and Astro (Handlebars, ERB, Markdown): the check names those
+  files instead of measuring them.
 - Which pages to screenshot: the session names them from the change; nothing maps files to routes for it.
 - A day-one stack scaffold, CI workflow and preview deploys: the kickoff sets up identity and product files, not
   the app itself.

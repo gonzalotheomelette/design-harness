@@ -31,4 +31,6 @@ node <harness>/bin/check-a11y.mjs /route   # axe, light and dark, desktop and ph
 npx -y @google/design.md@0.4.0 lint --format=text DESIGN.md   # tokens and contrast; exits 0 on warnings
 ```
 
-In Claude Code the review-before-show hook runs these through the ui-review agent before any change is handed back.
+In Claude Code the review-before-show hook runs the copy and drift checks itself and hands their results to the
+ui-review agent. When the dev server is up, the session adds screenshots and the accessibility run. The DESIGN.md
+lint runs when DESIGN.md changes, by hand or in the kickoff.

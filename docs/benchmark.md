@@ -86,7 +86,8 @@ and the session takes the screenshots.
 
 In eight real review reports, only one repeated its fingerprint as instructed, so the hook does not depend on it: a
 review counts when Claude Code records the call as completed and its report carries the packet's token. All 39
-benchmark reports on 0.7.0 opened with their token.
+benchmark reports on 0.7.0 opened with their token, read from the packet's README as 0.7.0 placed it; from 0.9.0 the
+token is only on the first line of change.diff, and the benchmark script now builds it there too.
 
 0.7.0's packet flow, live: a headless session made a wordy toast, the hook held the turn and wrote the packet, the
 reviewer (Read, Grep and Glob, all three confirmed working in a plugin agent) flagged the toast against its sibling
