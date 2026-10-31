@@ -146,8 +146,10 @@ do when asking.
 Copy from `templates/`:
 
 - `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack,
-  and `modes` listing the colour modes the product ships (a light-only product lists only `light`, so nothing is
-  screenshotted or checked in a mode it does not have).
+  and `modes` listing the colour modes the product ships. The template starts with `light` alone: add `dark` once
+  DESIGN.md defines the dark twin of every colour token, so nothing is screenshotted or checked in a mode it has no
+  palette for. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. Commit the file:
+  the harness reads its settings from the last commit, so a change cannot loosen them on the way through.
 - `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace, enables the plugins, and allows the pinned DESIGN.md linter).
   Its `ref` pins the harness to the release tag current at kickoff, so a later change to the harness cannot change
   this project's behaviour until someone moves the tag on purpose. Before handing a repo to a client's developers,

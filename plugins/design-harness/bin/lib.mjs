@@ -12,7 +12,7 @@ export const DEFAULTS = {
   // Rendered files. A project narrows these in .claude/design-harness.json when its UI lives elsewhere.
   // Plain .ts is left out on purpose: it is mostly logic and server code, and chart colours and fixtures there read as
   // drift. Markdown content (.mdx) is prose, not interface copy.
-  ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.css', '**/*.scss', '**/*.sass', '**/*.less'],
+  ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.html', '**/*.css', '**/*.scss', '**/*.sass', '**/*.less'],
   // Files allowed to hold raw colour values and arbitrary sizes: the theme the tokens are written into.
   themeFiles: ['**/theme.css', '**/tokens.css', '**/globals.css', '**/tailwind.css', 'DESIGN.md'],
   rules: 'docs/ui-consistency.md',
@@ -110,12 +110,20 @@ export function treeExists(root, tree) {
   }
 }
 
-// The project's settings, or null when the harness has not been set up here (the hook then stays silent).
+// The project's settings, or null when the harness has not been set up here (the hook then stays silent). The copy
+// in the last commit wins over the working copy: a change can edit the working copy (narrow `ui` until nothing it
+// touched counts as rendered, or point `browserPath` at a program), and a blind review showed both. A project that
+// has not committed its settings yet uses the working copy, so a kickoff works before its first commit.
 export function loadConfig(root) {
   const p = join(root, '.claude', 'design-harness.json')
-  if (!existsSync(p)) return null
+  let text = null
   try {
-    return { ...DEFAULTS, ...JSON.parse(readFileSync(p, 'utf8')) }
+    text = git(root, 'show', 'HEAD:./.claude/design-harness.json')
+  } catch {}
+  if (text === null && existsSync(p)) text = readFileSync(p, 'utf8')
+  if (text === null) return null
+  try {
+    return { ...DEFAULTS, ...JSON.parse(text) }
   } catch {
     return null
   }
@@ -168,8 +176,25 @@ export function changedFiles(root, base, globs) {
     .filter(Boolean)
 }
 
-// The `--base=` a check was given, or the branch's base.
-export const baseArg = (config, root) => process.argv.find((a) => a.startsWith('--base='))?.slice(7) || baseOf(root, config)
+// The `--base=` a check was given, or the branch's base. It must name a commit or tree: passed on unchecked,
+// `--base=--output=<file>` reached git as an option, truncated the file and made the check pass on a change it never
+// read. Anything else ends the check with exit 2, which no caller reads as clean.
+export function baseArg(config, root) {
+  const given = process.argv.find((a) => a.startsWith('--base='))?.slice(7)
+  if (!given) return baseOf(root, config)
+  let ok = !given.startsWith('-')
+  if (ok)
+    try {
+      git(root, 'rev-parse', '--verify', '--quiet', '--end-of-options', `${given}^{tree}`)
+    } catch {
+      ok = false
+    }
+  if (!ok) {
+    console.log(`NOT RUN: --base=${given} is not a commit or tree in this repository.`)
+    process.exit(2)
+  }
+  return given
+}
 
 // The pages a browser check may open, from its arguments: paths resolve against the dev server, and only local
 // addresses are allowed. The reviewer runs these checks with arguments it chose while reading untrusted code, and an

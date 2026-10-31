@@ -68,6 +68,10 @@ components:
 
 {Each colour, what it is for, and what it is never used for. State the rule for the primary colour plainly.}
 
+{Dark mode, when the product has one: a `-dark` twin for every colour token (`canvas-dark`, `ink-dark`, ...), each
+chosen for the dark scene rather than inverted, and checked for contrast like the rest. Add `dark` to `modes` in
+.claude/design-harness.json only once these exist, so nothing is screenshotted or checked in a mode with no palette.}
+
 ## Typography
 
 {The families and why; the scale; where each step is used.}

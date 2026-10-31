@@ -87,8 +87,33 @@ const EXCLUDE = config.copyExclude ?? ['**/*.test.*', '**/*.stories.*', '**/node
 
 const wordsOf = (t) => t.trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length
 
+// Strings held in this file's constants (`const SAVE = 'Save changes'`, `const COPY = { save: '…' }`), so copy moved
+// out of the markup is still measured; anything else a slot holds (a prop, `t('key')`) is collected in `opaque` and
+// reported as not measured, never passed as clean. A blind review measured a 12-word button held in a const reading as
+// "every one is within its limit".
+let consts = new Map()
+let opaque = []
 function textOf(node) {
   if (!node) return ''
+  // A wrapper component passing its own children through is not copy; its callers are measured where they write it.
+  if (/^(props\.)?children$/.test(node.getText?.() ?? '')) return ''
+  if (ts.isIdentifier(node)) {
+    const v = consts.get(node.text)
+    if (typeof v === 'string') return v
+    opaque.push(node.text)
+    return ''
+  }
+  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+    const v = consts.get(node.expression.text)
+    if (v && typeof v === 'object' && typeof v[node.name.text] === 'string') return v[node.name.text]
+    opaque.push(node.getText())
+    return ''
+  }
+  if (ts.isCallExpression(node) || ts.isElementAccessExpression(node) || ts.isPropertyAccessExpression(node)) {
+    opaque.push(node.getText())
+    return ''
+  }
+  if (ts.isAsExpression(node) || ts.isSatisfiesExpression?.(node)) return textOf(node.expression)
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
   if (ts.isTemplateExpression(node)) return [node.head.text, ...node.templateSpans.flatMap((s) => ['X', s.literal.text])].join('')
   if (ts.isJsxText(node)) return node.text
@@ -106,12 +131,31 @@ function collect(file) {
   const src = readFileSync(join(root, file), 'utf8')
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, /x$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const found = []
-  const add = (kind, node, text) => {
-    const clean = text.replace(/\s+/g, ' ').trim()
-    if (!/[A-Za-z]/.test(clean)) return
+  consts = new Map()
+  const literal = (n) => (n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) ? n.text : undefined)
+  const unwrap = (n) => (n && (ts.isAsExpression(n) || ts.isSatisfiesExpression?.(n)) ? unwrap(n.expression) : n)
+  const scan = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      const init = unwrap(node.initializer)
+      if (literal(init) !== undefined) consts.set(node.name.text, literal(init))
+      else if (init && ts.isObjectLiteralExpression(init)) {
+        const obj = {}
+        for (const p of init.properties) if (ts.isPropertyAssignment(p) && literal(unwrap(p.initializer)) !== undefined) obj[p.name.getText(sf)] = literal(unwrap(p.initializer))
+        consts.set(node.name.text, obj)
+      }
+    }
+    ts.forEachChild(node, scan)
+  }
+  scan(sf)
+  // Every slot is measured through here: `get` reads the text with `opaque` reset, so a slot whose words could not be
+  // read is recorded as such.
+  const add = (kind, node, get) => {
+    opaque = []
+    const clean = get().replace(/\s+/g, ' ').trim()
     const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
     const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1
-    found.push({ file, line, end, kind, text: clean, words: wordsOf(clean) })
+    if (/[A-Za-z]/.test(clean)) found.push({ file, line, end, kind, text: clean, words: wordsOf(clean) })
+    else if (opaque.length) found.push({ file, line, end, kind, opaque: opaque[0] })
   }
   const measured = new Set()
   const visit = (node) => {
@@ -129,23 +173,23 @@ function collect(file) {
           holder = inner[0]
           if (asChild) measured.add(holder)
         }
-        const literal = holder.children.filter((c) => ts.isJsxText(c) || (ts.isJsxExpression(c) && textOf(c)))
-        if (literal.length) add(kind, node, literal.map(textOf).join(' '))
+        const parts = holder.children.filter((c) => ts.isJsxText(c) || ts.isJsxExpression(c))
+        if (parts.length) add(kind, node, () => parts.map(textOf).join(' '))
       }
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       for (const attr of node.attributes.properties) {
         if (!ts.isJsxAttribute(attr) || !attr.initializer) continue
         const kind = ATTR_KIND[attr.name.getText(sf)]
-        if (kind) add(kind, attr, textOf(attr.initializer))
+        if (kind) add(kind, attr, () => textOf(attr.initializer))
       }
     }
     // toast('...'), toast.success('...'), setToast({ text }), onDone({ text }): any call that reports an act.
     if (ts.isCallExpression(node) && /(toast|done|receipt|notify)/i.test(node.expression.getText(sf))) {
       const arg = node.arguments[0]
       if (arg && ts.isObjectLiteralExpression(arg)) {
-        for (const p of arg.properties) if (ts.isPropertyAssignment(p) && /^(text|title|message)$/.test(p.name.getText(sf))) add('toast', p, textOf(p.initializer))
-      } else if (arg) add('toast', node, textOf(arg))
+        for (const p of arg.properties) if (ts.isPropertyAssignment(p) && /^(text|title|message)$/.test(p.name.getText(sf))) add('toast', p, () => textOf(p.initializer))
+      } else if (arg) add('toast', node, () => textOf(arg))
     }
     ts.forEachChild(node, visit)
   }
@@ -198,15 +242,21 @@ if (SURVEY) {
   process.exit(0)
 }
 
+const unmeasured = items.filter((i) => i.opaque)
+items = items.filter((i) => !i.opaque)
 const label = ALL ? 'in the project' : 'added on this branch'
 console.log(`copy-length: ${items.length} strings ${label} measured, across ${new Set(items.map((i) => i.file)).size} files`)
+if (unmeasured.length) {
+  console.log(`copy-length: ${unmeasured.length} slot(s) hold copy it could not read (a prop, a call, an import); read them by hand:`)
+  for (const i of unmeasured.slice(0, 15)) console.log(`  ${i.file}:${i.line}  ${i.kind} holds {${i.opaque}}`)
+}
 if (!items.length && files.length) {
   console.log(`copy-length: NOT A CLEAN PASS. ${files.length} file(s) changed and no copy could be measured in them; read their strings by hand.`)
   process.exit(0)
 }
 const over = items.filter((i) => i.words > LIMITS[i.kind])
 if (!over.length) {
-  console.log('copy-length: every one is within its limit')
+  console.log(unmeasured.length ? 'copy-length: NOT A CLEAN PASS. Every measured string is within its limit; the slots above were not measured.' : 'copy-length: every one is within its limit')
   process.exit(0)
 }
 for (const i of over) console.log(`  ${i.file}:${i.line}  ${i.kind} is ${i.words} words (limit ${LIMITS[i.kind]}): "${i.text}"`)

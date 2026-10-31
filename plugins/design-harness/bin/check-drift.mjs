@@ -8,8 +8,12 @@
  * read, so an older codebase never blocks new work; the theme files the tokens live in are exempt.
  *
  * Flags:
- *   colour   a raw colour literal (hex, rgb/hsl/oklch/oklab/lab/lch) in a rendered file
- *   size     a Tailwind arbitrary length or colour (`p-[13px]`, `text-[#333]`, `w-[37rem]`)
+ *   colour   a raw colour literal (hex, rgb/hsl/oklch/oklab/lab/lch), or a named CSS colour set on a colour property
+ *            (`color: 'red'` in a style object, `background: white` in a stylesheet)
+ *   palette  a Tailwind default palette class (`bg-blue-600`, `text-gray-500`): the theme's tokens are the palette.
+ *            A project whose tokens ARE Tailwind's palette sets `"allowPalette": true`
+ *   size     a Tailwind arbitrary value holding a length, calc() or colour (`p-[13px]`, `grid-cols-[200px_1fr]`,
+ *            `w-[calc(100%-13px)]`, `text-[#333]`)
  *   forced   an important override (`!text-red-700`, `text-red-700!`, `!important`): the component lost and was
  *            beaten at the call site instead of fixed where it lives
  *
@@ -29,9 +33,20 @@ const scope = addedLines(root, base, config.ui)
 // The project's TypeScript, when it has one, finds strings exactly; without it a scanner stands in.
 const ts = projectRequire(root, 'typescript')
 
+// Named colours a hand reaches for; the full CSS list is mostly ones nobody types (papayawhip).
+const NAMED =
+  'black|white|red|green|blue|yellow|orange|purple|pink|gray|grey|silver|maroon|navy|teal|olive|lime|aqua|fuchsia|' +
+  'coral|tomato|gold|crimson|indigo|violet|salmon|beige|ivory|khaki|lavender|tan|brown|cyan|magenta|whitesmoke|' +
+  'gainsboro|lightgray|lightgrey|darkgray|darkgrey|dimgray|slategray|snow|linen'
+const PALETTE =
+  'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose'
 const RULES = [
+  ['size', /\b[\w:-]+-\[[^\]\s]*?(?:\d(?:px|rem|em|vh|vw|svh|dvh|lvh|ch|%)|calc\(|#[0-9a-fA-F]{3,8}|(?:rgba?|hsla?|oklch)\()[^\]\s]*\]/],
   ['colour', /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/],
-  ['size', /\b[\w:-]+-\[(?:-?\d*\.?\d+(?:px|rem|em|vh|vw|%)|#[0-9a-fA-F]{3,8}|(?:rgba?|hsla?|oklch)\([^\]]*\))\]/],
+  ['colour', new RegExp(`(?:^|[\\s;{])(?:color|background(?:-color)?|border(?:-[a-z]+)?-?color|border|fill|stroke|outline(?:-color)?)\\s*:[^;{}]*?(?<![\\w-])(?:${NAMED})(?![\\w-])`, 'i')],
+  ...(config.allowPalette
+    ? []
+    : [['palette', new RegExp(`(?:^|[\\s"'\`:])(?:bg|text|border|ring|ring-offset|fill|stroke|from|via|to|outline|decoration|divide|placeholder|caret|accent|shadow)-(?:${PALETTE})-(?:50|[1-9]00|950)(?:/\\d+)?(?=$|[\\s"'\`])`)]]),
   ['forced', /(?:^|[\s"'`])![a-z][\w:-]*|\b[a-z][\w-]*-[\w/.-]+!(?=[\s"'`]|$)|!important/],
 ]
 
@@ -98,8 +113,21 @@ function stringsByAst(file, src) {
     ts.SyntaxKind.TemplateMiddle,
     ts.SyntaxKind.TemplateTail,
   ])
+  // Strings that are not styling, whatever they look like: `href="#added"` is a valid hex colour.
+  const NOT_STYLE = /^(href|id|to|htmlFor|for|key|name|src|alt|title|aria-[\w-]+|data-[\w-]+|role|type|target|rel)$/
+  const ignored = (node) => {
+    const p = node.parent
+    if (p && ts.isJsxAttribute(p)) return NOT_STYLE.test(p.name.getText(sf))
+    if (p && ts.isCallExpression(p)) return /querySelector|getElementById|scrollIntoView|push|replace|navigate/.test(p.expression.getText(sf))
+    return p && (ts.isImportDeclaration(p) || ts.isExportDeclaration(p))
+  }
   const visit = (node) => {
-    if (KINDS.has(node.kind)) {
+    // A colour property in a style object: `{ color: 'red' }` reads as the line a stylesheet would have.
+    if (ts.isPropertyAssignment(node) && ts.isStringLiteralLike(node.initializer) && /colou?r|background|fill|stroke|border|outline/i.test(node.name.getText(sf))) {
+      const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
+      ;(out.get(line) ?? out.set(line, []).get(line)).push(`color: ${node.initializer.text}`)
+    }
+    if (KINDS.has(node.kind) && !ignored(node)) {
       const start = node.getStart(sf)
       const first = sf.getLineAndCharacterOfPosition(start).line + 1
       src

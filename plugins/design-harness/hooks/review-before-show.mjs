@@ -15,14 +15,25 @@
  *                     and a call that has only started does not count), the session is asked to run it in the
  *                     foreground. The review reads only what changed since the last review, or since the turn began.
  *
+ * The reviewer has no shell. Every time it was given one, a blind review found a way to turn the allowed commands into
+ * arbitrary ones (a planted folder's node_modules, a planted repository's git config, a screenshot script the change
+ * itself edited). So the hook does what the shell was for: it writes a packet with the change, the copy and drift
+ * checks run on exactly that change, and whether the dev server serves this checkout, and asks the session (which
+ * has a shell anyway) to add pictures. The packet holds a token the report must start with, so a review that never
+ * opened the packet does not count.
+ *
+ * After the review, fixes the session makes are checked once by the copy and drift checks before the turn ends; the
+ * next review reads them in full.
+ *
  * It asks at most `maxReviewsPerMessage` times per message (default once), then lets the turn end with a note to the
  * person, so it can never loop. It is silent in a project without .claude/design-harness.json. The request is returned
  * as additionalContext, shown as hook feedback; `decision: 'block'` is shown as "Stop hook error occurred".
  *
  * State lives in the worktree's git directory, never committed and never shared between worktrees.
  */
-import { createHash } from 'node:crypto'
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { createHash, randomBytes } from 'node:crypto'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { baseOf, gitDiff, gitDirOf, keepTree, loadConfig, pathspec, snapshot, treeExists } from '../bin/lib.mjs'
@@ -49,6 +60,15 @@ try {
 const session = String(input.session_id || 'unknown').replace(/[^\w-]/g, '')
 const statePath = join(gitDir, `review-before-show.${session}.json`)
 const logPath = join(gitDir, 'review-before-show.log')
+const packetOf = (fingerprint) => join(gitDir, 'design-harness', 'review', fingerprint)
+// A harness check run on this project, as the hook: { code, out }.
+const runCheck = (script, ...args) => {
+  try {
+    return { code: 0, out: execFileSync('node', [join(HARNESS, 'bin', script), ...args], { cwd: root, encoding: 'utf8', timeout: 25000, stdio: ['ignore', 'pipe', 'pipe'] }) }
+  } catch (e) {
+    return { code: e.status ?? 2, out: `${e.stdout ?? ''}${e.signal ? `${script}: NOT RUN, it did not finish in 25 s\n` : ''}` }
+  }
+}
 const readJson = (p, fallback) => {
   try {
     return JSON.parse(readFileSync(p, 'utf8'))
@@ -73,12 +93,16 @@ try {
 }
 
 // Has a ui-review naming this fingerprint been called, and has its report come back? The transcript is read as JSON,
-// not matched as text, so key order cannot hide a call. A foreground call counts only when Claude Code recorded it as
-// completed: a call that errored (an unknown agent type, a refused tool) also returns a tool_result, and counting that
-// let a turn through with nothing reviewed. A background call counts when its task notification says completed.
-// Reports are not required to repeat the fingerprint: in eight real reviews only one did.
+// not matched as text, so key order cannot hide a call. A call counts only when Claude Code recorded it as completed
+// (an errored call also returns a result) AND its report carries the packet's token: a reviewer told to reply "no
+// findings" without opening the packet cannot know it. A background call counts when its completion is in the
+// transcript and so is the token.
 function reviewOf(fingerprint) {
   if (!fingerprint || !input.transcript_path || !existsSync(input.transcript_path)) return { called: false, reported: false }
+  let token = null
+  try {
+    token = readFileSync(join(packetOf(fingerprint), 'token'), 'utf8').trim()
+  } catch {}
   const entries = []
   for (const line of readFileSync(input.transcript_path, 'utf8').split('\n')) {
     try {
@@ -86,6 +110,7 @@ function reviewOf(fingerprint) {
     } catch {}
   }
   const blocks = (e) => (Array.isArray(e?.message?.content) ? e.message.content : [])
+  const textOf = (v) => (typeof v === 'string' ? v : JSON.stringify(v ?? ''))
   const calls = new Set()
   for (const e of entries)
     for (const b of blocks(e))
@@ -97,20 +122,64 @@ function reviewOf(fingerprint) {
       )
         calls.add(b.id)
   if (!calls.size) return { called: false, reported: false }
+  let completed = false
+  let tokenSeen = false
   for (const e of entries) {
-    for (const b of blocks(e)) {
-      const text = typeof b.content === 'string' ? b.content : JSON.stringify(b.content ?? b.text ?? '')
-      if (b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error && e.toolUseResult?.status === 'completed')
-        return { called: true, reported: true }
-      for (const id of calls)
-        if (text.includes(`<tool-use-id>${id}</tool-use-id>`) && text.includes('<status>completed</status>')) return { called: true, reported: true }
-    }
-    if (typeof e?.message?.content === 'string')
-      for (const id of calls)
-        if (e.message.content.includes(`<tool-use-id>${id}</tool-use-id>`) && e.message.content.includes('<status>completed</status>'))
-          return { called: true, reported: true }
+    if (e.type !== 'user') continue
+    const whole = textOf(e.message?.content)
+    if (token && whole.includes(token)) tokenSeen = true
+    for (const b of blocks(e))
+      if (b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error && e.toolUseResult?.status === 'completed') {
+        completed = true
+        if (token && textOf(b.content).includes(token)) return { called: true, reported: true }
+      }
+    for (const id of calls) if (whole.includes(`<tool-use-id>${id}</tool-use-id>`) && whole.includes('<status>completed</status>')) completed = true
   }
-  return { called: true, reported: false }
+  if (completed && tokenSeen) return { called: true, reported: true }
+  return { called: true, reported: false, unread: completed }
+}
+
+// The packet the reviewer reads instead of running anything: the change, the checks on it, and the server's state.
+function writePacket(fingerprint, from, now, UI) {
+  const dir = packetOf(fingerprint)
+  mkdirSync(dir, { recursive: true })
+  const token = randomBytes(8).toString('hex')
+  writeFileSync(join(dir, 'token'), token)
+  writeFileSync(
+    join(dir, 'change.diff'),
+    gitDiff(root, '--relative', '--stat', from, now, '--', ...UI) + '\n' + gitDiff(root, '--relative', from, now, '--', ...UI),
+  )
+  const copy = runCheck('check-copy-length.mjs', `--base=${from}`)
+  const drift = runCheck('check-drift.mjs', `--base=${from}`)
+  writeFileSync(join(dir, 'checks.txt'), `${copy.out}\n${drift.out}`)
+  const server = runCheck('server-of.mjs').out.trim()
+  writeFileSync(join(dir, 'server.txt'), server + '\n')
+  writeFileSync(
+    join(dir, 'README.md'),
+    [
+      `# Review packet ${fingerprint}`,
+      '',
+      `review-token: ${token}`,
+      '',
+      'Start your report with the review-token line above, exactly as written.',
+      '',
+      `- base: ${from}`,
+      `- change.diff: the change, \`git diff --relative ${from} ${now}\`, new files included, with its --stat on top`,
+      '- checks.txt: copy length and drift on exactly this change, run by the hook',
+      '- server.txt: whether the dev server serves this checkout',
+      `- the AI-look register: ${HARNESS}/reference/ai-look.md`,
+      '- browser.txt: screenshots and accessibility, when the session took them (listed image paths open with Read)',
+      '',
+    ].join('\n'),
+  )
+  // Keep the twenty newest packets.
+  const all = dirname(dir)
+  readdirSync(all)
+    .map((n) => ({ n, t: statSync(join(all, n)).mtimeMs }))
+    .sort((a, b) => b.t - a.t)
+    .slice(20)
+    .forEach(({ n }) => rmSync(join(all, n), { recursive: true, force: true }))
+  return { dir, serving: /: yes/.test(server) }
 }
 
 function main() {
@@ -151,8 +220,28 @@ function main() {
   const files = changedSince(from)
   if (!files.length) process.exit(0)
 
-  // Fixes the session made after this message's review: they ride with the next change rather than raising a note.
-  if (state.reviewed) process.exit(0)
+  // Fixes the session made after this message's review. The next review reads them in full; before this turn ends,
+  // the copy and drift checks read them once, so a fix that adds a long string or a raw value is not handed over.
+  if (state.reviewed) {
+    if (state.fixesChecked || !state.askedTree) process.exit(0)
+    state.fixesChecked = true
+    save()
+    const found = [runCheck('check-copy-length.mjs', `--base=${state.askedTree}`), runCheck('check-drift.mjs', `--base=${state.askedTree}`)]
+      .filter((r) => r.code === 1)
+      .flatMap((r) => r.out.split('\n').filter((l) => /^ {2}\S/.test(l)))
+    if (!found.length) process.exit(0)
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'Stop',
+          additionalContext:
+            `The fixes made after the review added these, which the checks flag:\n${found.slice(0, 12).join('\n')}\n` +
+            `Fix them, or tell the person why they stay. No second review is needed.`,
+        },
+      }),
+    )
+    process.exit(0)
+  }
 
   // The fingerprint names the change as it stands, so the same state is never reviewed twice.
   const fingerprint = createHash('sha1').update(gitDiff(root, '--relative', from, now, '--', ...UI)).update(from).digest('hex').slice(0, 12)
@@ -186,6 +275,10 @@ function main() {
     keepTree(root, 'asked', now)
     save()
   }
+  const packet = existsSync(join(packetOf(fingerprint), 'token')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI)
+  const shoot = config.screenshot
+    ? `the project's screenshot command (${config.screenshot})`
+    : `\`node ${HARNESS}/bin/shoot.mjs /<route>\``
 
   const list = files.slice(0, 10).join(', ') + (files.length > 10 ? `, and ${files.length - 10} more` : '')
   process.stdout.write(
@@ -193,14 +286,22 @@ function main() {
       hookSpecificOutput: {
         hookEventName: 'Stop',
         additionalContext:
-          `Rendered files changed and have not been reviewed (${files.length}: ${list}). Before handing this back, ` +
-          (pending ? `note that the ui-review you started has not reported, and a review still running in the background does not count. ` : '') +
-          `run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) and wait for its report. ` +
-          `Put these lines in its prompt: "fingerprint: ${fingerprint}", "harness: ${HARNESS}", "base: ${from}", ` +
-          `"change: git diff --relative ${from} ${now}" (two snapshots, so new files are in it) and one sentence on what ` +
-          `the change is for. Then fix the findings you agree with in what this turn built. Anything that would change a ` +
-          `surface this turn did not set out to change, or that contradicts what the person asked for, is theirs to ` +
-          `decide: list it for them instead of changing it.`,
+          `Rendered files changed and have not been reviewed (${files.length}: ${list}). Before handing this back: ` +
+          (pending
+            ? review.unread
+              ? `the ui-review you ran did not open its packet (its report lacks the review-token line); run it again. `
+              : `the ui-review you started has not reported, and a review still running in the background does not count. `
+            : '') +
+          (packet.serving
+            ? `1. The dev server serves this checkout, so take pictures of the pages this change renders with ${shoot}, and ` +
+              `run \`node ${HARNESS}/bin/check-a11y.mjs /<route>\` on them, writing both outputs to ${packet.dir}/browser.txt. `
+            : '') +
+          `${packet.serving ? '2' : '1'}. Run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) and ` +
+          `wait for its report. Its prompt: "packet: ${packet.dir}", "fingerprint: ${fingerprint}", and one sentence on ` +
+          `what the change is for. The reviewer has no shell; the packet holds the change and the checks. ` +
+          `Then fix the findings you agree with in what this turn built. Anything that would change a surface this turn ` +
+          `did not set out to change, or that contradicts what the person asked for, is theirs to decide: list it for ` +
+          `them instead of changing it.`,
       },
     }),
   )

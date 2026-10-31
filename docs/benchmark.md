@@ -42,10 +42,10 @@ write and said so, and the turn took 30 seconds. An earlier trial found two faul
 the background by default (a review counts only once its report is back), and `decision: block` is shown as a hook
 error (the request is now `additionalContext`).
 
-The reviewer's shell limit, 2026-10-31, headless with the plugin loaded: the session allowed `git log`, `ls` and
-`touch /tmp/…` outright, then ran the reviewer and told it to run all three. `git log` and `ls` ran; the hook refused
-`touch` with its reason and no file appeared. The same `touch` from the main session ran. So the hook input does carry
-the calling agent's type, which the unit tests can only simulate.
+A shell limit for the reviewer (0.5.1 to 0.6.0) worked in a live trial and still lost to blind review twice: allowed
+commands turned into arbitrary ones through a planted node_modules, a planted repository's git config, a screenshot
+script the change edited, `.npmrc`, and an `rg` flag. From 0.7.0 the reviewer has no shell; the hook runs the checks
+and the session takes the screenshots.
 
 In eight real review reports, only one repeated its fingerprint as instructed, so the hook does not depend on it: a
 review counts when Claude Code records the call as completed, and an errored call does not.

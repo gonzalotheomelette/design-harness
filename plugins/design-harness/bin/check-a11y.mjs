@@ -49,6 +49,7 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 let serious = 0
 let runs = 0
 let passed = 0
+let unloaded = 0
 try {
   for (const url of targets) {
     for (const colorScheme of config.modes ?? ['light', 'dark']) {
@@ -56,8 +57,10 @@ try {
         const page = await browser.page({ colorScheme, viewport })
         const res = await page.goto(url).catch((e) => ({ error: e }))
         if (!res || res.error || res.status() >= 400) {
+          // A page that did not load is a setup problem (wrong route, server down), not a violation: counted as one, it
+          // read to the reviewer as an accessibility failure on a page that was never checked.
           console.log(`  ${url} [${colorScheme}, ${label}]: could not load (${res?.error?.message ?? res?.status?.()})`)
-          serious++
+          unloaded++
           await page.close()
           continue
         }
@@ -79,4 +82,9 @@ try {
   await browser.close()
 }
 console.log(`a11y: ${targets.length} page(s), ${runs} page/mode/width runs with ${browser.kind}, ${passed} rule passes, ${serious} serious or critical`)
-process.exit(serious ? 1 : 0)
+if (serious) process.exit(1)
+if (unloaded) {
+  console.log(`a11y: NOT A CLEAN PASS. ${unloaded} run(s) could not load their page, so they checked nothing.`)
+  process.exit(2)
+}
+process.exit(0)

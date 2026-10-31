@@ -2,6 +2,7 @@
   "ui": [
     "**/*.tsx",
     "**/*.jsx",
+    "**/*.html",
     "**/*.css",
     "**/*.scss"
   ],
@@ -21,7 +22,7 @@
   "questions": "docs/open-questions.md",
   "screenshot": null,
   "modes": [
-    "light",
-    "dark"
-  ]
+    "light"
+  ],
+  "allowPalette": false
 }

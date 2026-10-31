@@ -8,13 +8,12 @@ makes after the review are read by the next one.
 ## What it does
 
 - **Review before show.** When a Claude Code turn changes anything rendered, a Stop hook holds the turn until a
-  fresh-context reviewer has read that exact change. The reviewer compares each surface with its closest sibling,
-  checks the project's settled rules and an AI-look register, measures copy length against the project's approved
-  copy, checks token drift and accessibility, and reports. The session fixes what it agrees with and says what it
-  left. Later reviews read only what changed since the last one. The reviewer's shell is limited to read-only
-  git, the harness checks, search and the project's last-committed screenshot command, run from the project root,
-  and its browser checks open local addresses only, so instructions planted in the code it reads cannot get it to
-  run anything else or send anything out.
+  fresh-context reviewer has read that exact change. The hook runs the copy-length and drift checks on the change
+  and hands the reviewer a packet; the session adds screenshots and an accessibility run when this checkout's dev
+  server is up. The reviewer compares each surface with its closest sibling, checks the project's settled rules and
+  an AI-look register, reads the packet, and reports. It has no shell, so instructions planted in the code it reads
+  have nothing to run. The session fixes what it agrees with and says what it left; the checks read those fixes once
+  before the turn ends, and the next review reads them in full.
 - **Kickoff, with or without a mood board.** `/design-harness:kickoff` starts from a brief. It builds the mood board
   with you when there isn't one, or brings in what exists (a Claude Design artifact, a Figma file, a live site, a
   brand guide). It turns that into `PRODUCT.md`,
@@ -103,7 +102,7 @@ your-project/
 ```
 .claude-plugin/marketplace.json     the "omelette" marketplace: design-harness plus the pinned external plugins
 plugins/design-harness/
-  hooks/                            review-before-show (Stop + UserPromptSubmit), reviewer-shell (PreToolUse)
+  hooks/                            review-before-show (Stop + UserPromptSubmit): the turn gate and the review packet
   agents/ui-review.md               the reviewer (Sonnet: as accurate as Opus in the benchmark, and faster)
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
@@ -131,9 +130,11 @@ rules or its model change.
 - Anything but macOS, on purpose: the dev-server proof uses `lsof` and the browser search knows Mac paths first.
 - Fixes made after a review reach the next review, not this turn's: a second review of every fix would double the
   wait for little.
-- Supply chain below the top level: the harness is pinned by a tag only its owner can move, external plugins by
-  commit, and the DESIGN.md linter by version, but the linter's own dependencies float, and Impeccable downloads a
-  binary on first use.
+- Supply chain below the top level: external plugins are pinned by commit and the DESIGN.md linter by version, but
+  the harness itself only by tag (Claude Code's marketplace source takes a branch or tag, not a commit), the linter's
+  own dependencies float, and Impeccable downloads a binary on first use.
+- Copy behind a translation call or a prop: the copy check lists those slots for the reviewer instead of measuring
+  them.
 - Copy length in Vue, Svelte and Astro files: the check names them instead of measuring them.
 - Route inference assumes file-based routing (Next.js); other routers need the route named by hand.
 - A day-one stack scaffold, CI workflow and preview deploys: the kickoff sets up identity and product files, not
