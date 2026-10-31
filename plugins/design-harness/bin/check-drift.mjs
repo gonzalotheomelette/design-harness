@@ -20,7 +20,7 @@
  * A line can opt out with a trailing comment containing `drift-ok: <reason>`, which the reviewer reads.
  *
  * Usage: node check-drift.mjs [--base=<ref>]   (from the project root)
- * Exit: 0 clean · 1 drift found.
+ * Exit: 0 clean · 1 drift found · 2 not a clean pass (nothing it could read, or a bad --base).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -155,11 +155,23 @@ for (const [file, lines] of scope) {
   // the code too flagged `if (!paid)` as a forced override on the first the client prototype trial.
   const stylesheet = /\.(css|scss|sass|less)$/.test(file)
   const strings = stylesheet ? null : ts && /\.[jt]sx?$/.test(file) ? stringsByAst(file, text.join('\n')) : stringsByLine(text)
+  // A <style> block in a .vue, .svelte, .astro or .html file is a stylesheet: its lines are read whole, like a .css
+  // file's. Reading only its quoted strings passed `color: #ff0000` as clean.
+  const inStyle = new Set()
+  if (!stylesheet && !/\.[jt]sx?$/.test(file)) {
+    let open = false
+    text.forEach((line, i) => {
+      if (/<style[\s>]/i.test(line)) open = true
+      if (open) inStyle.add(i + 1)
+      if (/<\/style>/i.test(line)) open = false
+    })
+  }
   text.forEach((line, i) => {
     if (lines !== 'all' && !lines.has(i + 1)) return
     read++
-    if (/drift-ok:/.test(line) || (stylesheet && /^\s*(\/\/|\*|\/\*)/.test(line))) return
-    const haystacks = stylesheet ? [line] : (strings.get(i + 1) ?? [])
+    const sheet = stylesheet || inStyle.has(i + 1)
+    if (/drift-ok:/.test(line) || (sheet && /^\s*(\/\/|\*|\/\*)/.test(line))) return
+    const haystacks = sheet ? [line.replace(/<\/?style[^>]*>/gi, '')] : (strings.get(i + 1) ?? [])
     for (const text of haystacks)
     for (const [kind, re] of RULES) {
       const m = text.match(re)
@@ -178,7 +190,7 @@ console.log(`drift: ${read} added line(s) read across ${scope.size} rendered fil
 const unread = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, config.themeFiles)).length
 if (!read && unread) {
   console.log(`drift: NOT A CLEAN PASS. ${unread} changed file(s) could not be read; check them by hand.`)
-  process.exit(0)
+  process.exit(2)
 }
 if (!findings.length) {
   console.log('drift: no raw colours, arbitrary sizes or forced overrides')

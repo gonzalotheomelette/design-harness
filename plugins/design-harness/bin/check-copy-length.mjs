@@ -19,7 +19,8 @@
  * counts its longer branch.
  *
  * Usage: node check-copy-length.mjs [--all | --survey | --base=<ref>]   (run from the project root)
- * Exit: 0 clean, or not measurable (said so) · 1 a string is over its limit · 2 setup problem.
+ * Exit: 0 clean · 1 a string is over its limit · 2 not a clean pass: something it could not measure, named, or a
+ *       setup problem. A caller never reads 2 as clean.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -198,6 +199,7 @@ function collect(file) {
 }
 
 let scope = null
+let notClean = false
 let files
 if (ALL) {
   files = git(root, 'ls-files', '--', ...pathspec(COPY_FILES)).split('\n').filter(Boolean)
@@ -208,17 +210,20 @@ if (ALL) {
   const listed = changedFiles(root, base, COPY_FILES).filter((f) => !matchesAny(f, EXCLUDE))
   if (listed.length && !files.length) {
     console.log(`copy-length: NOT A CLEAN PASS. git lists ${listed.length} changed file(s) but none could be read; check their copy by hand.`)
-    process.exit(0)
+    process.exit(2)
   }
   // Rendered files this parser cannot read (Vue, Svelte, Astro): name them, so silence is never read as a pass.
   const unreadable = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, COPY_FILES) && !/\.(css|scss)$/.test(f))
-  if (unreadable.length) console.log(`copy-length: NOT RUN on ${unreadable.length} file(s) it cannot parse (${unreadable.slice(0, 5).join(', ')}); read their copy by hand.`)
+  if (unreadable.length) {
+    notClean = true
+    console.log(`copy-length: NOT RUN on ${unreadable.length} file(s) it cannot parse (${unreadable.slice(0, 5).join(', ')}); read their copy by hand.`)
+  }
 }
 files = files.filter((f) => existsSync(join(root, f)) && !matchesAny(f, EXCLUDE))
 if (!ts) {
   if (files.length) console.log(`copy-length: NOT RUN on ${files.length} file(s): this project has no typescript package to parse with (npm i -D typescript).`)
   else console.log('copy-length: nothing it can parse changed')
-  process.exit(0)
+  process.exit(files.length || notClean ? 2 : 0)
 }
 
 let items = files.flatMap(collect)
@@ -252,11 +257,15 @@ if (unmeasured.length) {
 }
 if (!items.length && files.length) {
   console.log(`copy-length: NOT A CLEAN PASS. ${files.length} file(s) changed and no copy could be measured in them; read their strings by hand.`)
-  process.exit(0)
+  process.exit(2)
 }
 const over = items.filter((i) => i.words > LIMITS[i.kind])
 if (!over.length) {
-  console.log(unmeasured.length ? 'copy-length: NOT A CLEAN PASS. Every measured string is within its limit; the slots above were not measured.' : 'copy-length: every one is within its limit')
+  if (unmeasured.length || notClean) {
+    console.log('copy-length: NOT A CLEAN PASS. Every measured string is within its limit; what is named above was not measured.')
+    process.exit(2)
+  }
+  console.log('copy-length: every one is within its limit')
   process.exit(0)
 }
 for (const i of over) console.log(`  ${i.file}:${i.line}  ${i.kind} is ${i.words} words (limit ${LIMITS[i.kind]}): "${i.text}"`)

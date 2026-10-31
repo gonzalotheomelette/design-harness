@@ -36,7 +36,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { baseOf, gitDiff, gitDirOf, keepTree, loadConfig, pathspec, snapshot, treeExists } from '../bin/lib.mjs'
+import { baseOf, git, gitDiff, gitDirOf, keepTree, loadConfig, pathspec, snapshot, treeExists } from '../bin/lib.mjs'
 
 const HARNESS = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -81,7 +81,9 @@ try {
   if (input.hook_event_name === 'UserPromptSubmit') {
     const turnStart = snapshot(root, config.ui)
     keepTree(root, 'turn', turnStart)
-    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart }))
+    // The person's own words go to the reviewer: the session's one-line summary of its own work is the framing a
+    // fresh reader is there to avoid.
+    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart, request: String(input.prompt ?? '').slice(0, 6000) }))
     process.exit(0)
   }
   if (input.hook_event_name && input.hook_event_name !== 'Stop') process.exit(0)
@@ -93,10 +95,10 @@ try {
 }
 
 // Has a ui-review naming this fingerprint been called, and has its report come back? The transcript is read as JSON,
-// not matched as text, so key order cannot hide a call. A call counts only when Claude Code recorded it as completed
-// (an errored call also returns a result) AND its report carries the packet's token: a reviewer told to reply "no
-// findings" without opening the packet cannot know it. A background call counts when its completion is in the
-// transcript and so is the token.
+// not matched as text. A call counts only when Claude Code recorded its result as completed (an errored call also
+// returns a result) AND that result, the report itself, carries the packet's token. Matching the token anywhere in
+// the transcript let a session that had read the packet itself, or echoed a completion notice, pass a review that
+// never opened it. A review run in the background is never counted: the hook asks for the foreground.
 function reviewOf(fingerprint) {
   if (!fingerprint || !input.transcript_path || !existsSync(input.transcript_path)) return { called: false, reported: false }
   let token = null
@@ -110,7 +112,6 @@ function reviewOf(fingerprint) {
     } catch {}
   }
   const blocks = (e) => (Array.isArray(e?.message?.content) ? e.message.content : [])
-  const textOf = (v) => (typeof v === 'string' ? v : JSON.stringify(v ?? ''))
   const calls = new Set()
   for (const e of entries)
     for (const b of blocks(e))
@@ -123,24 +124,18 @@ function reviewOf(fingerprint) {
         calls.add(b.id)
   if (!calls.size) return { called: false, reported: false }
   let completed = false
-  let tokenSeen = false
-  for (const e of entries) {
-    if (e.type !== 'user') continue
-    const whole = textOf(e.message?.content)
-    if (token && whole.includes(token)) tokenSeen = true
+  for (const e of entries)
     for (const b of blocks(e))
-      if (b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error && e.toolUseResult?.status === 'completed') {
+      if (e.type === 'user' && b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error && e.toolUseResult?.status === 'completed') {
         completed = true
-        if (token && textOf(b.content).includes(token)) return { called: true, reported: true }
+        const report = typeof b.content === 'string' ? b.content : JSON.stringify(b.content ?? '')
+        if (token && report.includes(`review-token: ${token}`)) return { called: true, reported: true }
       }
-    for (const id of calls) if (whole.includes(`<tool-use-id>${id}</tool-use-id>`) && whole.includes('<status>completed</status>')) completed = true
-  }
-  if (completed && tokenSeen) return { called: true, reported: true }
   return { called: true, reported: false, unread: completed }
 }
 
 // The packet the reviewer reads instead of running anything: the change, the checks on it, and the server's state.
-function writePacket(fingerprint, from, now, UI) {
+function writePacket(fingerprint, from, now, UI, state) {
   const dir = packetOf(fingerprint)
   mkdirSync(dir, { recursive: true })
   const token = randomBytes(8).toString('hex')
@@ -154,6 +149,8 @@ function writePacket(fingerprint, from, now, UI) {
   writeFileSync(join(dir, 'checks.txt'), `${copy.out}\n${drift.out}`)
   const server = runCheck('server-of.mjs').out.trim()
   writeFileSync(join(dir, 'server.txt'), server + '\n')
+  writeFileSync(join(dir, 'request.md'), `${state.request || '(not recorded: the hook was installed during this message)'}\n`)
+  writeFileSync(join(dir, 'settings.json'), JSON.stringify(config, null, 2) + '\n')
   writeFileSync(
     join(dir, 'README.md'),
     [
@@ -166,6 +163,8 @@ function writePacket(fingerprint, from, now, UI) {
       `- base: ${from}`,
       `- change.diff: the change, \`git diff --relative ${from} ${now}\`, new files included, with its --stat on top`,
       '- checks.txt: copy length and drift on exactly this change, run by the hook',
+      '- request.md: what the person asked for this turn, in their own words',
+      '- settings.json: the harness settings in effect (from the last commit, not the working copy)',
       '- server.txt: whether the dev server serves this checkout',
       `- the AI-look register: ${HARNESS}/reference/ai-look.md`,
       '- browser.txt: screenshots and accessibility, when the session took them (listed image paths open with Read)',
@@ -190,8 +189,14 @@ function main() {
   const changedSince = (from) => gitDiff(root, '--relative', '--name-only', from, now, '--', ...UI).split('\n').filter(Boolean)
   const readLog = () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean) : [])
   const isLogged = (fp) => readLog().some((l) => l.split(' ')[0] === fp)
+  // Each review is logged with the branch it was made on, so a branch switch starts the next range from the turn,
+  // not from a tree on another branch (which made the next review read the whole difference between branches).
+  let branch = 'detached'
+  try {
+    branch = git(root, 'symbolic-ref', '--short', '-q', 'HEAD').trim() || 'detached'
+  } catch {}
   const logReview = (fp, tree) => {
-    appendFileSync(logPath, `${fp} ${tree}\n`)
+    appendFileSync(logPath, `${fp} ${tree} ${branch}\n`)
     keepTree(root, 'reviewed', tree)
   }
 
@@ -212,8 +217,9 @@ function main() {
   // The change to review: since the last review on this worktree, else since the turn began, else the branch. A
   // logged tree that git has since pruned is skipped rather than diffed, which used to fail every turn after.
   const lastTree = readLog()
-    .map((l) => l.split(' ')[1])
-    .filter(Boolean)
+    .map((l) => l.split(' '))
+    .filter(([, t, b]) => t && b === branch)
+    .map(([, t]) => t)
     .reverse()
     .find((t) => treeExists(root, t))
   const from = lastTree ?? turnStart ?? baseOf(root, config)
@@ -222,11 +228,15 @@ function main() {
 
   // Fixes the session made after this message's review. The next review reads them in full; before this turn ends,
   // the copy and drift checks read them once, so a fix that adds a long string or a raw value is not handed over.
+  // Each later stop reads only what changed since the last check, at most twice a message, so a session that fixes a
+  // flagged line and adds another is read again without ever looping.
   if (state.reviewed) {
-    if (state.fixesChecked || !state.askedTree) process.exit(0)
-    state.fixesChecked = true
+    const fixBase = state.fixBase ?? state.askedTree
+    if (!fixBase || (state.fixChecks ?? 0) >= 2 || !changedSince(fixBase).length) process.exit(0)
+    state.fixChecks = (state.fixChecks ?? 0) + 1
+    state.fixBase = now
     save()
-    const found = [runCheck('check-copy-length.mjs', `--base=${state.askedTree}`), runCheck('check-drift.mjs', `--base=${state.askedTree}`)]
+    const found = [runCheck('check-copy-length.mjs', `--base=${fixBase}`), runCheck('check-drift.mjs', `--base=${fixBase}`)]
       .filter((r) => r.code === 1)
       .flatMap((r) => r.out.split('\n').filter((l) => /^ {2}\S/.test(l)))
     if (!found.length) process.exit(0)
@@ -275,9 +285,9 @@ function main() {
     keepTree(root, 'asked', now)
     save()
   }
-  const packet = existsSync(join(packetOf(fingerprint), 'token')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI)
+  const packet = existsSync(join(packetOf(fingerprint), 'token')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI, state)
   const shoot = config.screenshot
-    ? `the project's screenshot command (${config.screenshot})`
+    ? `your screenshot command from .claude/design-harness.local.json (${config.screenshot})`
     : `\`node ${HARNESS}/bin/shoot.mjs /<route>\``
 
   const list = files.slice(0, 10).join(', ') + (files.length > 10 ? `, and ${files.length - 10} more` : '')

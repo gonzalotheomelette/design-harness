@@ -7,8 +7,9 @@
     "**/*.scss"
   ],
   "themeFiles": [
-    "src/styles/theme.css",
-    "src/app/globals.css",
+    "**/theme.css",
+    "**/tokens.css",
+    "**/globals.css",
     "DESIGN.md"
   ],
   "rules": "docs/ui-consistency.md",
@@ -20,7 +21,6 @@
   "requirements": "docs/product",
   "decisions": "docs/decision-log.md",
   "questions": "docs/open-questions.md",
-  "screenshot": null,
   "modes": [
     "light"
   ],

@@ -36,6 +36,8 @@ if (!browser) {
   process.exit(2)
 }
 const out = mkdtempSync(join(tmpdir(), 'ui-review-'))
+let shots = 0
+let failed = 0
 try {
   for (const url of targets) {
     const slug = new URL(url).pathname.replace(/\W+/g, '-').replace(/^-|-$/g, '') || 'home'
@@ -45,10 +47,12 @@ try {
         const res = await page.goto(url).catch((e) => ({ error: e }))
         if (!res || res.error || res.status() >= 400) {
           console.log(`  ${url} [${colorScheme}, ${label}]: could not load (${res?.error?.message ?? res?.status?.()})`)
+          failed++
         } else {
           const file = join(out, `${slug}-${label}-${colorScheme}.png`)
           await page.screenshot(file)
           console.log(`  ${file}`)
+          shots++
         }
         await page.close()
       }
@@ -57,3 +61,6 @@ try {
 } finally {
   await browser.close()
 }
+// A run that loaded nothing took no pictures; exit 0 read as "looked, and fine".
+console.log(`shoot: ${shots} screenshot(s)${failed ? `, ${failed} page load(s) failed` : ''}`)
+process.exit(failed ? 2 : 0)

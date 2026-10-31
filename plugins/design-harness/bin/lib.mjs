@@ -52,8 +52,10 @@ export function gitDirOf(root) {
 }
 
 // Folders that are never the product's rendered source, excluded from every pathspec even where a project has no
-// .gitignore yet (a new project's node_modules was otherwise hashed into every snapshot).
-const NEVER = ['**/node_modules/**', '**/.next/**', '**/dist/**', '**/build/**', '**/.turbo/**', '**/coverage/**']
+// .gitignore yet (a new project's node_modules was otherwise hashed into every snapshot). Build output is excluded
+// only at the root: at any depth, `dist`, `build` and `coverage` are also route names, and a page at
+// src/app/coverage/page.tsx was never reviewed.
+const NEVER = ['**/node_modules/**', '**/.next/**', 'dist/**', 'build/**', '.turbo/**', 'coverage/**']
 export const pathspec = (globs) => [...globs.map((g) => `:(glob)${g}`), ...NEVER.map((g) => `:(exclude,glob)${g}`)]
 
 // The working state of the rendered files as a tree object, untracked files included, written through a scratch
@@ -114,6 +116,12 @@ export function treeExists(root, tree) {
 // in the last commit wins over the working copy: a change can edit the working copy (narrow `ui` until nothing it
 // touched counts as rendered, or point `browserPath` at a program), and a blind review showed both. A project that
 // has not committed its settings yet uses the working copy, so a kickoff works before its first commit.
+//
+// The two settings that name something to RUN, `screenshot` (a command) and `browserPath` (a program), are never read
+// from the project's settings, committed or not: a cloned repository could otherwise hand the session a command
+// through the hook's own instructions. They live in `.claude/design-harness.local.json`, which is read only while git
+// does not track it, so it is always this machine's.
+const LOCAL_ONLY = ['screenshot', 'browserPath']
 export function loadConfig(root) {
   const p = join(root, '.claude', 'design-harness.json')
   let text = null
@@ -122,10 +130,27 @@ export function loadConfig(root) {
   } catch {}
   if (text === null && existsSync(p)) text = readFileSync(p, 'utf8')
   if (text === null) return null
+  let shared
   try {
-    return { ...DEFAULTS, ...JSON.parse(text) }
+    shared = JSON.parse(text)
   } catch {
     return null
+  }
+  for (const k of LOCAL_ONLY) delete shared[k]
+  return { ...DEFAULTS, ...shared, ...localConfig(root) }
+}
+function localConfig(root) {
+  const p = join(root, '.claude', 'design-harness.local.json')
+  if (!existsSync(p)) return {}
+  try {
+    git(root, 'ls-files', '--error-unmatch', '--', p)
+    return {} // tracked, so it came with the repository, not from this machine
+  } catch {}
+  try {
+    const local = JSON.parse(readFileSync(p, 'utf8'))
+    return Object.fromEntries(LOCAL_ONLY.filter((k) => typeof local[k] === 'string').map((k) => [k, local[k]]))
+  } catch {
+    return {}
   }
 }
 

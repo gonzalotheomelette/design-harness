@@ -45,7 +45,8 @@ within this table, not with the one below.
 What it says:
 
 - **Run to run, the reviewer moves by about three hits in 32**, so a difference smaller than that between versions is
-  noise. 0.7.0 over 0.6.0 (11 to 14 against 7) is larger than that, and held on the held-out project too (2 against 1).
+  noise. On the client prototype, 0.7.0 over 0.6.0 (11 to 14 against 7) is larger than that. On the website, 2 against 1 is within
+  it, from a single 0.6.0 run: no difference shown there.
 - **It is a copy reviewer.** On the client prototype, where the corrections were mostly wordy copy and explainer lines, it found a
   third to nearly half outright and most of the rest in part, with few findings wasted. On the website, where the
   corrections were mostly visual (line breaks, a 44px gap, two animations stacked, a near-black that should match) or
@@ -92,6 +93,13 @@ reviewer (Read, Grep and Glob, all three confirmed working in a plugin agent) fl
 and questioned a claim the code did not back, the review was logged, and the turn took 37 seconds.
 
 ## Limits
+
+How this run differed from what ships, so its numbers are not read as more than they are: the packets diffed each
+case's whole commit, not only its rendered files (fixed in `bench/scripts/make-packet.mjs` since, which now builds the
+packet as the hook does); the reviewers were general Sonnet agents given the plugin's instructions, which in this
+session had no Grep or Glob and searched with read-only grep instead, not the plugin agent itself; and 0.6.0 ran once
+per case. The client prototype's answer keys and reports are not published (they quote a client's code), so 32 of the 51
+corrections can be checked only by someone with that repository.
 
 Thirteen cases, three runs each, one model judge per case: enough to see run-to-run spread and a version difference
 of the size measured, not small ones. The website is held out from the copy limits and the review rules, though not

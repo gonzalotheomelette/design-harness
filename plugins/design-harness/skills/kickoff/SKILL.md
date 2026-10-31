@@ -134,7 +134,7 @@ Write `design/README.md` saying what each holds and which DESIGN.md section gove
 Build a **style tile** route (or `design/style-tile.html` when there is no app yet): every colour token with its
 contrast pair, the type scale with real copy from PRODUCT.md's voice, buttons in every state, an input, a card, an
 empty state, a toast. Then build **one sample screen**: the product's main screen in its mode, with realistic data.
-Screenshot both at desktop and phone width, in light and dark, and look before showing. These two pages are what
+Screenshot both at desktop and phone width, in each colour mode the product has, and look before showing. These two pages are what
 the person approves; the tokens are not approved until they have seen them used.
 
 ## 8. Switch on the harness for this project
@@ -148,8 +148,13 @@ Copy from `templates/`:
 - `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack,
   and `modes` listing the colour modes the product ships. The template starts with `light` alone: add `dark` once
   DESIGN.md defines the dark twin of every colour token, so nothing is screenshotted or checked in a mode it has no
-  palette for. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. Commit the file:
-  the harness reads its settings from the last commit, so a change cannot loosen them on the way through.
+  palette for. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. `themeFiles`
+  are globs: make sure one matches wherever step 5 wrote the theme. Commit the file: the harness reads its settings
+  from the last commit, so a change cannot loosen them on the way through.
+- A project tool that takes screenshots as a signed-in persona, or a browser outside the usual places, goes in
+  `.claude/design-harness.local.json` as `screenshot` (a command, `{route}` where the path goes) or `browserPath`, and
+  that file goes in `.gitignore`. The harness reads these two only from that file and only while git does not track
+  it, so a repository someone clones can never hand the session a command to run.
 - `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace, enables the plugins, and allows the pinned DESIGN.md linter).
   Its `ref` pins the harness to the release tag current at kickoff, so a later change to the harness cannot change
   this project's behaviour until someone moves the tag on purpose. Before handing a repo to a client's developers,

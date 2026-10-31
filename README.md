@@ -7,8 +7,9 @@ makes after the review are read by the next one.
 
 ## What it does
 
-- **Review before show.** When a Claude Code turn changes anything rendered, a Stop hook holds the turn until a
-  fresh-context reviewer has read that exact change. The hook runs the copy-length and drift checks on the change
+- **Review before show.** When a Claude Code turn changes anything rendered, a Stop hook asks for a fresh-context
+  review of that exact change before the turn ends, once per message (a session that will not run it is let through
+  with a note saying so, so it can never loop). The hook runs the copy-length and drift checks on the change
   and hands the reviewer a packet; the session adds screenshots and an accessibility run when this checkout's dev
   server is up. The reviewer compares each surface with its closest sibling, checks the project's settled rules and
   an AI-look register, reads the packet, and reports. It has no shell, so instructions planted in the code it reads
@@ -138,7 +139,7 @@ rules or its model change.
 - Copy behind a translation call or a prop: the copy check lists those slots for the reviewer instead of measuring
   them.
 - Copy length in Vue, Svelte and Astro files: the check names them instead of measuring them.
-- Route inference assumes file-based routing (Next.js); other routers need the route named by hand.
+- Which pages to screenshot: the session names them from the change; nothing maps files to routes for it.
 - A day-one stack scaffold, CI workflow and preview deploys: the kickoff sets up identity and product files, not
   the app itself.
 - State that only exists after an action in the session: screenshots of a fresh page cannot show it, and the
