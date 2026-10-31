@@ -50,16 +50,12 @@ held-out project whose corrections were mostly visual and product calls, with no
    ~/dev/design-harness/dotfiles/install.sh
    ```
 
-2. In the new project, install the harness and run the kickoff with the mood board at hand:
+2. In the new project, install the harness and the skills it works with, before the kickoff (its second pass reads
+   frontend-design's list of generated looks):
 
    ```bash
    claude plugin install design-harness@omelette --scope project
    ```
-
-   Then, in Claude Code: `/design-harness:kickoff`
-
-3. The kickoff writes `.claude/settings.json`, which enables the other plugins for everyone who opens the project.
-   Install each once per machine:
 
    ```bash
    claude plugin install frontend-design@omelette --scope project
@@ -76,6 +72,9 @@ held-out project whose corrections were mostly visual and product calls, with no
    ```bash
    claude plugin install emil-design-engineering@omelette --scope project
    ```
+
+3. Then, in Claude Code: `/design-harness:kickoff`, with or without a mood board. It writes `.claude/settings.json`,
+   which keeps these plugins enabled for everyone who opens the project.
 
 ## What a project ends up with
 

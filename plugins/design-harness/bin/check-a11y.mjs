@@ -50,6 +50,7 @@ let serious = 0
 let runs = 0
 let passed = 0
 let unloaded = 0
+let blank = 0
 try {
   for (const url of targets) {
     for (const colorScheme of config.modes ?? ['light', 'dark']) {
@@ -69,7 +70,10 @@ try {
         // The population: a run that passed nothing checked nothing (a blank or still-loading page), which a
         // violation count of zero would otherwise report as clean.
         passed += passes.length
-        if (!passes.length) console.log(`  ${url} [${colorScheme}, ${label}]: axe passed no rules, so the page was likely blank`)
+        if (!passes.length) {
+          blank++
+          console.log(`  ${url} [${colorScheme}, ${label}]: axe passed no rules, so the page was likely blank`)
+        }
         for (const v of violations) {
           if (v.impact === 'serious' || v.impact === 'critical') serious++
           console.log(`  ${url} [${colorScheme}, ${label}] ${v.impact} ${v.id}: ${v.help} (${v.nodes.length}x, first: ${v.nodes[0]?.target?.join(' ')})`)
@@ -83,8 +87,9 @@ try {
 }
 console.log(`a11y: ${targets.length} page(s), ${runs} page/mode/width runs with ${browser.kind}, ${passed} rule passes, ${serious} serious or critical`)
 if (serious) process.exit(1)
-if (runs && !passed) {
-  console.log('a11y: NOT A CLEAN PASS. No rule passed on any page, so the pages were probably blank.')
+// Any blank run is a page that was not checked, even when the others were.
+if (blank) {
+  console.log(`a11y: NOT A CLEAN PASS. ${blank} run(s) passed no rule, so those pages were probably blank.`)
   process.exit(2)
 }
 if (unloaded) {

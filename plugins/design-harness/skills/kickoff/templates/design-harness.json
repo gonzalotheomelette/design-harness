@@ -4,7 +4,8 @@
     "**/*.jsx",
     "**/*.html",
     "**/*.css",
-    "**/*.scss"
+    "**/*.scss",
+    "!design/**"
   ],
   "themeFiles": [
     "**/theme.css",

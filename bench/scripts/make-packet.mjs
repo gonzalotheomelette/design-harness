@@ -1,4 +1,5 @@
-// Writes a review packet for a benchmark case the way the 0.7.0 hook does: change, checks on it, server state, token.
+// Writes a review packet for a benchmark case the way the hook does: change (token on its first line), the checks on
+// it, and the server state.
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'

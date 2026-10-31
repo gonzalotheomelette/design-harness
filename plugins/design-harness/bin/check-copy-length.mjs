@@ -101,7 +101,8 @@ const TAG_KIND = {
 const ATTR_KIND = { title: 'title', subtitle: 'subtitle', description: 'description', hint: 'description', caption: 'description', label: 'label', placeholder: 'placeholder' }
 const JSX_FILES = config.copyFiles ?? ['**/*.tsx', '**/*.jsx']
 const MARKUP_FILES = ['**/*.html', '**/*.vue', '**/*.svelte', '**/*.astro']
-const COPY_FILES = [...JSX_FILES, ...MARKUP_FILES]
+// The project's exclusions from `ui` (such as `!design/**`) apply to copy too.
+const COPY_FILES = [...JSX_FILES, ...MARKUP_FILES, ...config.ui.filter((g) => g.startsWith('!'))]
 // Elements whose words belong to the sentence around them.
 const INLINE = new Set(['strong', 'em', 'b', 'i', 'u', 'code', 'span', 'a', 'Link', 'mark', 'abbr', 'kbd', 'sub', 'sup', 'q', 'time', 'Strong', 'Code', 'TextLink'])
 const EXCLUDE = config.copyExclude ?? ['**/*.test.*', '**/*.stories.*', '**/node_modules/**']
@@ -142,7 +143,11 @@ function textOf(node) {
   if (ts.isParenthesizedExpression(node)) return textOf(node.expression)
   const longer = (a, b) => (wordsOf(a) >= wordsOf(b) ? a : b)
   if (ts.isConditionalExpression(node)) return longer(textOf(node.whenTrue), textOf(node.whenFalse))
-  if (ts.isBinaryExpression(node)) return longer(textOf(node.left), textOf(node.right))
+  // `'Save your changes ' + 'to the draft'` is one string; `a || b` and `a ?? b` show one side, so the longer counts.
+  if (ts.isBinaryExpression(node))
+    return node.operatorToken.kind === ts.SyntaxKind.PlusToken
+      ? `${textOf(node.left)}${textOf(node.right)}`
+      : longer(textOf(node.left), textOf(node.right))
   if (ts.isJsxFragment(node)) return node.children.map(textOf).join(' ')
   return ''
 }
@@ -249,7 +254,8 @@ function collect(file) {
       }
     }
     // toast('...'), toast.success('...'), setToast({ text }), onDone({ text }): any call that reports an act.
-    if (ts.isCallExpression(node) && /(toast|done|receipt|notify)/i.test(node.expression.getText(sf))) {
+    // Matched on the callee's own name segments, so `abandoned()` or `isDone()` is not taken for a toast.
+    if (ts.isCallExpression(node) && node.expression.getText(sf).split('.').some((part) => /^(toast\w*|\w*Toast|notify\w*|receipt\w*|onDone|done)$/i.test(part))) {
       const arg = node.arguments[0]
       if (arg && ts.isObjectLiteralExpression(arg)) {
         for (const p of arg.properties) if (ts.isPropertyAssignment(p) && /^(text|title|message)$/.test(p.name.getText(sf))) add('toast', p, () => textOf(p.initializer))

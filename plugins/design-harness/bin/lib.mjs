@@ -16,7 +16,8 @@ export const DEFAULTS = {
   // Rendered files. A project narrows these in .claude/design-harness.json when its UI lives elsewhere.
   // Plain .ts is left out on purpose: it is mostly logic and server code, and chart colours and fixtures there read as
   // drift. Markdown content (.mdx) is prose, not interface copy.
-  ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.html', '**/*.css', '**/*.scss', '**/*.sass', '**/*.less'],
+  // design/ holds the mood board and the style tile: design material, not the product, so never reviewed as UI.
+  ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.html', '**/*.css', '**/*.scss', '**/*.sass', '**/*.less', '!design/**'],
   // Files allowed to hold raw colour values and arbitrary sizes: the theme the tokens are written into.
   // design/ holds the mood board and the style tile, which show raw swatches on purpose.
   themeFiles: ['**/theme.css', '**/tokens.css', '**/globals.css', '**/tailwind.css', 'DESIGN.md', 'design/**'],
@@ -61,7 +62,11 @@ export function gitDirOf(root) {
 // only at the root: at any depth, `dist`, `build` and `coverage` are also route names, and a page at
 // src/app/coverage/page.tsx was never reviewed.
 const NEVER = ['**/node_modules/**', '**/.next/**', 'dist/**', 'build/**', '.turbo/**', 'coverage/**']
-export const pathspec = (globs) => [...globs.map((g) => `:(glob)${g}`), ...NEVER.map((g) => `:(exclude,glob)${g}`)]
+// A glob starting with `!` excludes: `!design/**` keeps the mood board and style tile out of review.
+export const pathspec = (globs) => [
+  ...globs.map((g) => (g.startsWith('!') ? `:(exclude,glob)${g.slice(1)}` : `:(glob)${g}`)),
+  ...NEVER.map((g) => `:(exclude,glob)${g}`),
+]
 
 // The working state of the rendered files as a tree object, untracked files included, written through a scratch
 // index so the real one is untouched. It starts from a copy of the real index, so git reuses its record of which
@@ -372,4 +377,6 @@ export function globToRegExp(glob) {
     .replace(/\u0001/g, '.*')
   return new RegExp(`^${re}$`)
 }
-export const matchesAny = (file, globs) => globs.some((g) => globToRegExp(g).test(file))
+export const matchesAny = (file, globs) =>
+  globs.some((g) => !g.startsWith('!') && globToRegExp(g).test(file)) &&
+  !globs.some((g) => g.startsWith('!') && globToRegExp(g.slice(1)).test(file))

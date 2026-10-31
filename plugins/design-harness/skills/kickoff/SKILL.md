@@ -93,8 +93,8 @@ then this harness's extra sections (Iconography, Imagery, Motion, Chosen on purp
 tier per object size, spacing scale, the layout concept, and the one signature move. Derive them from the mood
 board and the use scene, not from habit.
 
-**Second pass, against the defaults.** Read `../../reference/ai-look.md` (from this skill's folder) and the
-frontend-design skill's list of generated looks. For every choice that is a default rather than a decision for this
+**Second pass, against the defaults.** Read `../../reference/ai-look.md` (from this skill's folder), which distils
+the generated looks the external skills list, and the frontend-design skill's own list when that plugin is installed. For every choice that is a default rather than a decision for this
 brief (cream and terracotta, the SaaS card kit, an eyebrow above every heading, a near-black ground with one neon
 accent), revise it and say what changed and why. Anything from that list the brief genuinely calls for goes under
 **Chosen on purpose**, so the reviewer does not flag it later.
@@ -134,7 +134,11 @@ Write `design/README.md` saying what each holds and which DESIGN.md section gove
 Build a **style tile** route (or `design/style-tile.html` when there is no app yet): every colour token with its
 contrast pair, the type scale with real copy from PRODUCT.md's voice, buttons in every state, an input, a card, an
 empty state, a toast. Then build **one sample screen**: the product's main screen in its mode, with realistic data.
-Screenshot both at desktop and phone width, in each colour mode the product has, and look before showing. These two pages are what
+Before the first screenshot, check the project has a browser library; for a JavaScript project with neither
+Playwright nor Puppeteer, ask before adding one: `npm i -D playwright @axe-core/playwright && npx playwright install
+chromium`. Then screenshot both at desktop and phone width, in each colour mode the product has (`node
+<harness>/bin/shoot.mjs design/style-tile.html` opens a file inside the project when there is no app yet), and look
+before showing. These two pages are what
 the person approves; the tokens are not approved until they have seen them used.
 
 ## 8. Switch on the harness for this project
@@ -169,12 +173,9 @@ Copy from `templates/`:
 - `AGENTS.md` to the project root (what any coding agent must know), and `CLAUDE.md` beside it, which imports it and
   stays under 200 lines.
 
-For a JavaScript project, ask before adding the dev dependencies the checks use:
-`npm i -D playwright @axe-core/playwright && npx playwright install chromium`. The copy and drift checks need
-nothing installed: they parse with the TypeScript that ships with the harness.
-
-Tell the person that external plugins enabled in project settings need one install each, once per machine:
-`claude plugin install <name>@omelette --scope project` for each plugin the settings list.
+The copy and drift checks need nothing installed: they parse with the TypeScript that ships with the harness. If the
+person has not installed the external plugins yet (the README installs them before the kickoff), tell them each needs
+one install per machine: `claude plugin install <name>@omelette --scope project` for each plugin the settings list.
 
 ## 9. Show
 

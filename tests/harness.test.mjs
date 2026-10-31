@@ -384,7 +384,7 @@ test('fixes made after the review are checked once before the turn ends', () => 
   const fp = fpOf(askFor(dir))
   write(dir, { 'src/a.tsx': 'export const A = () => <p className="w-[13px]">x</p>\n' })
   const ctx = hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out?.hookSpecificOutput?.additionalContext ?? ''
-  assert.match(ctx, /fixes made after the review/)
+  assert.match(ctx, /work after the review/)
   assert.match(ctx, /w-\[13px\]/)
   assert.equal(hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out, null, 'once, then the turn ends')
 })
@@ -750,4 +750,69 @@ test('only the harness\'s own reviewer counts, and a pruned packet is rebuilt ra
   rmSync(join(packetDir(dir, fp), 'server.txt'))
   const again = hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out
   assert.ok(again, 'the hook still answers')
+})
+
+// Round eight.
+
+test('design/ is design material: editing it asks for no review and its copy is not measured', () => {
+  const dir = repo({ 'design/moodboard/index.html': 'x\n', 'src/a.tsx': 'x\n' }, { ui: ['**/*.html', '**/*.tsx', '!design/**'] })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'design/moodboard/index.html': '<h2>Direction B: Nordic workshop with brass accents and oak</h2>\n' })
+  assert.equal(hook(dir, 'Stop').out, null)
+  assert.doesNotMatch(check(dir, 'check-copy-length.mjs').stdout, /moodboard/)
+  assert.ok(matchesAny('src/a.tsx', ['**/*.tsx', '!design/**']) && !matchesAny('design/x.tsx', ['**/*.tsx', '!design/**']))
+})
+
+test('work after a review gets a second review when the settings allow one', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx'], maxReviewsPerMessage: 2 })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'y\n' })
+  const first = fpOf(askFor(dir))
+  const t = reported(dir, first)
+  write(dir, { 'src/b.tsx': 'export const B = () => <h1>A whole new page</h1>\n' })
+  const ctx = hook(dir, 'Stop', { transcript_path: t }).out?.hookSpecificOutput?.additionalContext ?? ''
+  assert.match(ctx, /ui-review/, ctx)
+  assert.match(ctx, /1: src\/b\.tsx/, 'only what came after the first review')
+})
+
+test('with one review a message, files created after it are named to the person', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'y\n' })
+  const t = reported(dir, fpOf(askFor(dir)))
+  write(dir, { 'src/b.tsx': 'export const B = () => <h1>New page</h1>\n' })
+  const out = hook(dir, 'Stop', { transcript_path: t }).out
+  assert.match(out?.systemMessage ?? '', /1 rendered file\(s\) created after this message's review were not reviewed \(src\/b\.tsx\)/)
+  // The next message reads it.
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'z\n' })
+  assert.match(askFor(dir), /src\/b\.tsx/)
+})
+
+test('copy joined with + is measured whole, and only real toast calls are toasts', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  write(dir, {
+    'src/a.tsx':
+      "export const A = () => <main><Button>{'Save your changes ' + 'to the draft now'}</Button></main>\n" +
+      "const x = () => { abandoned('this is a long string that is not a toast at all'); toast.success('Saved and shared with everyone on your whole team today') }\n",
+  })
+  const out = check(dir, 'check-copy-length.mjs').stdout
+  assert.match(out, /a\.tsx:1 {2}button is 7 words/, out)
+  assert.match(out, /a\.tsx:2 {2}toast is 10 words/, out)
+  assert.doesNotMatch(out, /not a toast at all/, out)
+})
+
+test('one blank page among several makes the accessibility run not clean', () => {
+  const dir = repo({ 'src/a.tsx': 'x' })
+  write(dir, {
+    'node_modules/puppeteer/package.json': '{"name":"puppeteer","main":"index.js"}',
+    'node_modules/puppeteer/index.js': `module.exports = { launch: async () => ({
+      newPage: async () => ({ setViewport: async () => {}, emulateMediaFeatures: async () => {}, goto: async () => ({ status: () => 200 }), close: async () => {} }),
+      close: async () => {} }) }`,
+    'node_modules/@axe-core/puppeteer/package.json': '{"name":"@axe-core/puppeteer","main":"index.js"}',
+    'node_modules/@axe-core/puppeteer/index.js': 'let n = 0; module.exports = { AxePuppeteer: class { withTags() { return this } async analyze() { n++; return { violations: [], passes: n === 1 ? [] : [{ id: "x" }] } } } }',
+  })
+  const r = check(dir, 'check-a11y.mjs', '/one', '/two')
+  assert.equal(r.status, 2, r.stdout + r.stderr)
+  assert.match(r.stdout, /1 run\(s\) passed no rule/)
 })

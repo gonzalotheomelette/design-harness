@@ -269,26 +269,51 @@ function main() {
   // Each later stop reads only what changed since the last check, at most twice a message, so a session that fixes a
   // flagged line and adds another is read again without ever looping.
   if (state.reviewed) {
-    const fixBase = state.fixBase ?? state.askedTree
-    if (!fixBase || (state.fixChecks ?? 0) >= 2 || !changedSince(fixBase).length) process.exit(0)
-    state.fixChecks = (state.fixChecks ?? 0) + 1
-    state.fixBase = now
-    save()
-    const found = [runCheck('check-copy-length.mjs', `--base=${fixBase}`), runCheck('check-drift.mjs', `--base=${fixBase}`)]
-      .filter((r) => r.code === 1)
-      .flatMap((r) => r.out.split('\n').filter((l) => /^ {2}\S/.test(l)))
-    if (!found.length) process.exit(0)
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'Stop',
-          additionalContext:
-            `The fixes made after the review added these, which the checks flag:\n${found.slice(0, 12).join('\n')}\n` +
-            `Fix them, or tell the person why they stay. No second review is needed.`,
-        },
-      }),
-    )
-    process.exit(0)
+    // Work after this message's review. When the person's settings allow another review, it gets one, reading only
+    // what came after the first (`from` is the tree that review was asked about). Otherwise the copy and drift checks
+    // read it, and files created since the review, which are new surfaces rather than fixes, are named to the person:
+    // before, a whole new page built after the review ended the turn with nothing said.
+    if (state.blocks < config.maxReviewsPerMessage) {
+      state.reviewed = false
+      state.rechased = false
+      delete state.fixBase
+      save()
+    } else {
+      const fixBase = state.fixBase ?? state.askedTree
+      if (!fixBase || !changedSince(fixBase).length) process.exit(0)
+      const created = gitDiff(root, '--relative', '--name-only', '--diff-filter=A', state.askedTree, now, '--', ...UI).split('\n').filter(Boolean)
+      const note =
+        created.length && !state.notedCreated
+          ? `Review before show: ${created.length} rendered file(s) created after this message's review were not reviewed (${created.slice(0, 5).join(', ')}); the next review reads them.`
+          : null
+      if (note) state.notedCreated = true
+      let found = []
+      if ((state.fixChecks ?? 0) < 2) {
+        state.fixChecks = (state.fixChecks ?? 0) + 1
+        state.fixBase = now
+        found = [runCheck('check-copy-length.mjs', `--base=${fixBase}`), runCheck('check-drift.mjs', `--base=${fixBase}`)]
+          .filter((r) => r.code === 1)
+          .flatMap((r) => r.out.split('\n').filter((l) => /^ {2}\S/.test(l)))
+      }
+      save()
+      if (!found.length && !note) process.exit(0)
+      process.stdout.write(
+        JSON.stringify({
+          ...(note ? { systemMessage: note } : {}),
+          ...(found.length
+            ? {
+                hookSpecificOutput: {
+                  hookEventName: 'Stop',
+                  additionalContext:
+                    `The work after the review added these, which the checks flag:\n${found.slice(0, 12).join('\n')}\n` +
+                    `Fix them, or tell the person why they stay.`,
+                },
+              }
+            : {}),
+        }),
+      )
+      process.exit(0)
+    }
   }
 
   // The fingerprint names the change as it stands, so the same state is never reviewed twice.
