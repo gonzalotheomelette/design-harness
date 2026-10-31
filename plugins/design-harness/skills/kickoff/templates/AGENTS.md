@@ -28,7 +28,7 @@ For any coding agent (Claude Code, Codex, Cursor). Claude Code reads it through 
 node <harness>/bin/check-copy-length.mjs   # copy longer than the approved copy of its kind
 node <harness>/bin/check-drift.mjs         # raw colours, arbitrary sizes, forced overrides
 node <harness>/bin/check-a11y.mjs /route   # axe, light and dark, desktop and phone
-npx @google/design.md lint DESIGN.md       # token references and contrast
+npx -y @google/design.md@0.4.0 lint --format=text DESIGN.md   # tokens and contrast; exits 0 on warnings
 ```
 
 In Claude Code the review-before-show hook runs these through the ui-review agent before any change is handed back.

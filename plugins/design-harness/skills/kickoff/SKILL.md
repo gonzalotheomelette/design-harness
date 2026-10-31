@@ -99,17 +99,21 @@ brief (cream and terracotta, the SaaS card kit, an eyebrow above every heading, 
 accent), revise it and say what changed and why. Anything from that list the brief genuinely calls for goes under
 **Chosen on purpose**, so the reviewer does not flag it later.
 
-Then lint it, which checks token references and WCAG contrast:
+Then lint it, which checks token references, tokens nothing uses, and WCAG contrast:
 
 ```bash
-npx @google/design.md lint DESIGN.md
+npx -y @google/design.md@0.4.0 lint --format=text DESIGN.md
 ```
 
-Fix every error and every contrast warning before going on.
+It exits 0 even with warnings, and a failing contrast pair is a warning, so read the summary rather than the exit
+code. Fix every error and every warning before going on; a warning left in place is either fixed or explained in
+DESIGN.md. The version is pinned, like everything else here, so a new release cannot change what passes; move it
+on purpose. The first run downloads it and asks the person once (auto mode refuses unasked downloads); from step 8
+on, the project's settings allow this exact command.
 
 ## 5. Generate the tokens
 
-For Tailwind v4: `npx @google/design.md export --format css-tailwind DESIGN.md > src/styles/theme.css` (or where the
+For Tailwind v4: `npx -y @google/design.md@0.4.0 export --format css-tailwind DESIGN.md > src/styles/theme.css` (or where the
 project's CSS lives), imported once from the global stylesheet. For Tailwind v3, `--format json-tailwind`. Otherwise
 `--format dtcg` for a token pipeline. This file is the only place raw values may live; the drift check exempts it.
 
@@ -144,7 +148,7 @@ Copy from `templates/`:
 - `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack,
   and `modes` listing the colour modes the product ships (a light-only product lists only `light`, so nothing is
   screenshotted or checked in a mode it does not have).
-- `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace and enables the plugins).
+- `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace, enables the plugins, and allows the pinned DESIGN.md linter).
   Its `ref` pins the harness to the release tag current at kickoff, so a later change to the harness cannot change
   this project's behaviour until someone moves the tag on purpose. Before handing a repo to a client's developers,
   move the plugin settings to `.claude/settings.local.json` (or remove them): the marketplace is private, and the
@@ -176,7 +180,7 @@ Kickoff is not a gate the project passes once. Any step can be rerun when the di
 mood board, a palette that is not working on real screens, a client's brand refresh. When DESIGN.md changes:
 
 1. Keep a copy of the old file first (`git show HEAD:DESIGN.md > /tmp/DESIGN.before.md`), edit, then show the person
-   what moved: `npx @google/design.md diff /tmp/DESIGN.before.md DESIGN.md` lists every token added, removed or
+   what moved: `npx -y @google/design.md@0.4.0 diff /tmp/DESIGN.before.md DESIGN.md` lists every token added, removed or
    changed, and whether contrast got worse.
 2. Lint again, regenerate the theme file (step 5), and reshoot the style tile and the sample screen (step 7), so the
    change is approved on screens, not on values.

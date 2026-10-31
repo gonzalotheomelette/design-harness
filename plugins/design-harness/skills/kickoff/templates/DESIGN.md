@@ -7,8 +7,8 @@ colors:
   canvas: "#fbfbfa"
   muted: "#6b6b73"
   line: "#e4e4e7"
-  accent: "#2f5bd3"
-  on-accent: "#ffffff"
+  primary: "#2f5bd3"
+  on-primary: "#ffffff"
 typography:
   display:
     fontFamily: "{Display face}"
@@ -42,14 +42,19 @@ spacing:
   xl: 40px
 components:
   button-primary:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.canvas}"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.control}"
     padding: 10px 16px
   button-secondary:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
     rounded: "{rounded.control}"
+  helper-text:
+    textColor: "{colors.muted}"
+    typography: "{typography.label}"
+  divider:
+    backgroundColor: "{colors.line}"
 ---
 
 <!-- Every value above is a placeholder. Kickoff replaces them from the mood board in two passes; see the
@@ -61,7 +66,7 @@ components:
 
 ## Colors
 
-{Each colour, what it is for, and what it is never used for. State the rule for the accent plainly.}
+{Each colour, what it is for, and what it is never used for. State the rule for the primary colour plainly.}
 
 ## Typography
 

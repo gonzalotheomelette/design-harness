@@ -1,10 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npx -y @google/design.md@0.4.0 *)"
+    ]
+  },
   "extraKnownMarketplaces": {
     "omelette": {
       "source": {
         "source": "github",
         "repo": "gonzalotheomelette/design-harness",
-        "ref": "v0.5.1"
+        "ref": "v0.5.2"
       }
     }
   },
