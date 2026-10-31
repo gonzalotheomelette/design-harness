@@ -2,7 +2,7 @@
 // file, and what the branch is compared against. One place, so the hook and the checks never disagree about
 // which change they are looking at.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, readFileSync, statSync, utimesSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { createRequire } from 'node:module'
 
@@ -10,7 +10,9 @@ export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 export const DEFAULTS = {
   // Rendered files. A project narrows these in .claude/design-harness.json when its UI lives elsewhere.
-  ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.css'],
+  // Plain .ts is left out on purpose: it is mostly logic and server code, and chart colours and fixtures there read as
+  // drift. Markdown content (.mdx) is prose, not interface copy.
+  ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.css', '**/*.scss', '**/*.sass', '**/*.less'],
   // Files allowed to hold raw colour values and arbitrary sizes: the theme the tokens are written into.
   themeFiles: ['**/theme.css', '**/tokens.css', '**/globals.css', '**/tailwind.css', 'DESIGN.md'],
   rules: 'docs/ui-consistency.md',
@@ -56,10 +58,19 @@ export const pathspec = (globs) => [...globs.map((g) => `:(glob)${g}`), ...NEVER
 
 // The working state of the rendered files as a tree object, untracked files included, written through a scratch
 // index so the real one is untouched. It starts from a copy of the real index, so git reuses its record of which
-// files are unchanged instead of re-hashing the project, and adds only the rendered files.
+// files are unchanged instead of re-hashing the project, and adds only the rendered files. Each call has its own
+// scratch index: one shared file made two checks run side by side crash every time, each rewriting the other's index.
 export function snapshot(root, globs = DEFAULTS.ui) {
   const gitDir = gitDirOf(root)
-  const scratch = join(gitDir, 'design-harness.index')
+  const scratch = join(gitDir, `design-harness.${process.pid}.${Math.random().toString(36).slice(2)}.index`)
+  try {
+    return writeSnapshot(root, globs, scratch)
+  } finally {
+    rmSync(scratch, { force: true })
+    rmSync(`${scratch}.lock`, { force: true })
+  }
+}
+function writeSnapshot(root, globs, scratch) {
   const real = git(root, 'rev-parse', '--git-path', 'index').trim()
   const realPath = isAbsolute(real) ? real : join(root, real)
   const env = { ...process.env, GIT_INDEX_FILE: scratch }
@@ -159,6 +170,27 @@ export function changedFiles(root, base, globs) {
 
 // The `--base=` a check was given, or the branch's base.
 export const baseArg = (config, root) => process.argv.find((a) => a.startsWith('--base='))?.slice(7) || baseOf(root, config)
+
+// The pages a browser check may open, from its arguments: paths resolve against the dev server, and only local
+// addresses are allowed. The reviewer runs these checks with arguments it chose while reading untrusted code, and an
+// arbitrary URL is a way to send what it read somewhere else. Returns { targets, refused }.
+const LOCAL = /^(localhost|127(\.\d{1,3}){3}|\[::1\]|0\.0\.0\.0|[a-z0-9.-]+\.localhost)$/i
+export function localTargets(args, config) {
+  const targets = []
+  const refused = []
+  for (const a of args) {
+    let url
+    try {
+      url = new URL(a, config.devServer)
+    } catch {
+      refused.push(a)
+      continue
+    }
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && LOCAL.test(url.hostname)) targets.push(url.href)
+    else refused.push(a)
+  }
+  return { targets, refused }
+}
 
 // A package resolved from the PROJECT, not from the plugin, which ships no node_modules of its own.
 export function projectRequire(root, name) {

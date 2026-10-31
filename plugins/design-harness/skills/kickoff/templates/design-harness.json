@@ -1,10 +1,9 @@
 {
   "ui": [
-    "src/**/*.tsx",
-    "src/**/*.jsx",
-    "src/**/*.css",
-    "app/**/*.tsx",
-    "components/**/*.tsx"
+    "**/*.tsx",
+    "**/*.jsx",
+    "**/*.css",
+    "**/*.scss"
   ],
   "themeFiles": [
     "src/styles/theme.css",

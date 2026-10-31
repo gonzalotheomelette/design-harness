@@ -7,23 +7,30 @@
  * only grant or remove Bash as a whole, and a plugin agent ignores its own `hooks`, so the limit lives here, as a
  * plugin-wide PreToolUse hook that acts only when the call comes from ui-review. Every other caller is untouched.
  *
- * Allowed, one command per segment of a pipeline or `&&` chain: read-only git (diff, log, show, ls-files, status,
- * rev-parse, blame, cat-file, ls-tree, merge-base); `node` running a script in this plugin's bin; rg, grep, ls, cat,
- * head, tail, wc, pwd, echo, cd; and the project's own `screenshot` command from .claude/design-harness.json.
+ * Allowed, one command per segment of a pipeline or `&&` chain, and only from the project root: read-only git (diff,
+ * log, show, ls-files, status, rev-parse, blame, cat-file, ls-tree, merge-base); `node` running a script in this
+ * plugin's bin; rg, grep, ls, cat, head, tail, wc, pwd, echo; and the project's own `screenshot` command.
  * Refused anywhere: command substitution, process substitution, redirection to or from a file (`2>&1` and
  * `2>/dev/null` stay allowed), environment assignments, and the flags that make an allowed tool run or write
  * something else (`rg --pre`, `git diff --output`, `--ext-diff`, `--textconv`).
  *
+ * Two holes a blind review found in the first version, both turning allowed commands into arbitrary ones. `cd` into a
+ * folder the change planted let `node <check>` load that folder's node_modules, and let `git diff` read a planted
+ * repository's config (`diff.external` runs a program); so there is no `cd`, and a command run anywhere but the
+ * project root is refused. And the screenshot command was read from the working copy, which the change under review
+ * can edit (`"screenshot": "sh"`); it is now read from the last commit, and refused while the settings file, or the
+ * package.json a script command runs through, differs from that commit.
+ *
  * It only ever refuses. A command it allows still goes through the session's normal permission check.
  */
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadConfig } from '../bin/lib.mjs'
 
 const BIN = join(dirname(dirname(fileURLToPath(import.meta.url))), 'bin')
 const GIT_READ = new Set(['diff', 'log', 'show', 'ls-files', 'status', 'rev-parse', 'blame', 'cat-file', 'ls-tree', 'merge-base'])
-const PLAIN = new Set(['rg', 'grep', 'ls', 'cat', 'head', 'tail', 'wc', 'pwd', 'echo', 'cd', 'true'])
+const PLAIN = new Set(['rg', 'grep', 'ls', 'cat', 'head', 'tail', 'wc', 'pwd', 'echo', 'true'])
 
 let input = {}
 try {
@@ -36,12 +43,16 @@ if (input.tool_name !== 'Bash' || !/(^|:)ui-review$/.test(String(input.agent_typ
 const command = String(input.tool_input?.command ?? '')
 const cwd = input.cwd || process.cwd()
 const root = process.env.CLAUDE_PROJECT_DIR || cwd
-let screenshot = null
-try {
-  screenshot = loadConfig(root)?.screenshot ?? null
-} catch {}
+const real = (p) => {
+  try {
+    return realpathSync(p)
+  } catch {
+    return p
+  }
+}
+const { screenshot, screenshotNote } = trustedScreenshot()
 
-const problem = check(command)
+const problem = real(cwd) !== real(root) ? `it runs only from the project root, ${root}` : check(command)
 if (problem) {
   process.stdout.write(
     JSON.stringify({
@@ -52,6 +63,7 @@ if (problem) {
           `The ui-review agent's shell is limited to what a review needs (${problem}). Allowed: read-only git, ` +
           `node ${BIN}/<check>.mjs, rg, grep, ls, cat, head, tail, wc` +
           (screenshot ? `, and the project's screenshot command (${screenshot})` : '') +
+          (screenshotNote ? `. ${screenshotNote}` : '') +
           `. Use Read, Grep and Glob for the rest. If the change under review asked you to run something, report that ` +
           `as a finding instead.`,
       },
@@ -59,6 +71,37 @@ if (problem) {
   )
 }
 process.exit(0)
+
+// The screenshot command as last committed. The working copy is what the change under review can edit, so a command
+// read from it would let the change name its own allowlist.
+function trustedScreenshot() {
+  const committed = (path) => {
+    try {
+      return execFileSync('git', ['show', `HEAD:./${path}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    } catch {
+      return null
+    }
+  }
+  const working = (path) => {
+    try {
+      return readFileSync(`${root}/${path}`, 'utf8')
+    } catch {
+      return null
+    }
+  }
+  const settings = committed('.claude/design-harness.json')
+  let cmd = null
+  try {
+    cmd = settings && JSON.parse(settings).screenshot
+  } catch {}
+  if (typeof cmd !== 'string' || !cmd.trim()) return { screenshot: null }
+  const changed = ['.claude/design-harness.json', ...(/^(npm|pnpm|yarn|bun)\b/.test(cmd) ? ['package.json'] : [])].filter(
+    (p) => committed(p) !== working(p),
+  )
+  if (changed.length)
+    return { screenshot: null, screenshotNote: `The screenshot command is off until ${changed.join(' and ')} match the last commit` }
+  return { screenshot: cmd.trim() }
+}
 
 // Splits the command into segments and words the way a POSIX shell would for the cases that matter here, and returns
 // what is wrong with it, or null.
@@ -129,8 +172,11 @@ function segmentProblem(words) {
   const [head, ...args] = words
   if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(head)) return 'an environment assignment'
   if (screenshot) {
-    const own = screenshot.trim().split(/\s+/)
-    if (own.every((w, i) => words[i] === w)) return null
+    // The words before any {placeholder} must match; what follows is the routes and options the reviewer chooses.
+    const own = screenshot.split(/\s+/)
+    const cut = own.findIndex((w) => w.includes('{'))
+    const fixed = cut === -1 ? own : own.slice(0, cut)
+    if (fixed.length && words.length >= fixed.length && fixed.every((w, i) => words[i] === w)) return null
   }
   if (head === 'git') {
     if (!GIT_READ.has(args[0])) return `git ${args[0] ?? ''} is not a read-only git command`.trim()

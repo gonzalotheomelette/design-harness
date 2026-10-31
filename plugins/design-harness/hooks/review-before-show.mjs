@@ -72,28 +72,45 @@ try {
   process.exit(0)
 }
 
-// Has a ui-review naming this fingerprint been called, and has its report come back? A foreground report is a
-// tool_result for the call that is not the launch notice; a background one is a task-notification carrying the call's
-// id and a completed status.
+// Has a ui-review naming this fingerprint been called, and has its report come back? The transcript is read as JSON,
+// not matched as text, so key order cannot hide a call. A foreground call counts only when Claude Code recorded it as
+// completed: a call that errored (an unknown agent type, a refused tool) also returns a tool_result, and counting that
+// let a turn through with nothing reviewed. A background call counts when its task notification says completed.
+// Reports are not required to repeat the fingerprint: in eight real reviews only one did.
 function reviewOf(fingerprint) {
   if (!fingerprint || !input.transcript_path || !existsSync(input.transcript_path)) return { called: false, reported: false }
-  const lines = readFileSync(input.transcript_path, 'utf8').split('\n')
+  const entries = []
+  for (const line of readFileSync(input.transcript_path, 'utf8').split('\n')) {
+    try {
+      if (line) entries.push(JSON.parse(line))
+    } catch {}
+  }
+  const blocks = (e) => (Array.isArray(e?.message?.content) ? e.message.content : [])
   const calls = new Set()
-  for (const line of lines) {
-    if (!/"subagent_type":"(?:[\w-]+:)?ui-review"/.test(line) || !line.includes(`fingerprint: ${fingerprint}`)) continue
-    for (const m of line.matchAll(/"type":"tool_use","id":"([^"]+)","name":"(?:Agent|Task)"/g)) calls.add(m[1])
-  }
-  for (const id of calls) {
-    for (const line of lines) {
-      if (!line.includes(id)) continue
+  for (const e of entries)
+    for (const b of blocks(e))
       if (
-        (line.includes(`"tool_use_id":"${id}"`) && line.includes('"type":"tool_result"') && !line.includes('Async agent launched')) ||
-        (line.includes(`<tool-use-id>${id}</tool-use-id>`) && line.includes('<status>completed</status>'))
+        b.type === 'tool_use' &&
+        (b.name === 'Agent' || b.name === 'Task') &&
+        /(^|:)ui-review$/.test(String(b.input?.subagent_type ?? '')) &&
+        String(b.input?.prompt ?? '').includes(`fingerprint: ${fingerprint}`)
       )
+        calls.add(b.id)
+  if (!calls.size) return { called: false, reported: false }
+  for (const e of entries) {
+    for (const b of blocks(e)) {
+      const text = typeof b.content === 'string' ? b.content : JSON.stringify(b.content ?? b.text ?? '')
+      if (b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error && e.toolUseResult?.status === 'completed')
         return { called: true, reported: true }
+      for (const id of calls)
+        if (text.includes(`<tool-use-id>${id}</tool-use-id>`) && text.includes('<status>completed</status>')) return { called: true, reported: true }
     }
+    if (typeof e?.message?.content === 'string')
+      for (const id of calls)
+        if (e.message.content.includes(`<tool-use-id>${id}</tool-use-id>`) && e.message.content.includes('<status>completed</status>'))
+          return { called: true, reported: true }
   }
-  return { called: calls.size > 0, reported: false }
+  return { called: true, reported: false }
 }
 
 function main() {

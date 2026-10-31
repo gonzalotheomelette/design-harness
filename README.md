@@ -1,8 +1,9 @@
 # Design harness
 
 Omelette's starting point for every new product. The look is new for every client; the method is the same
-everywhere: a design decision written down once is enforced on every change after it, and nothing reaches the
-designer before a reviewer has compared it with what already exists.
+everywhere: a design decision written down once is enforced on every change after it, and a turn that changed the
+interface does not end until a fresh reviewer has compared that change with what already exists. Fixes the session
+makes after the review are read by the next one.
 
 ## What it does
 
@@ -11,8 +12,9 @@ designer before a reviewer has compared it with what already exists.
   checks the project's settled rules and an AI-look register, measures copy length against the project's approved
   copy, checks token drift and accessibility, and reports. The session fixes what it agrees with and says what it
   left. Later reviews read only what changed since the last one. The reviewer's shell is limited to read-only
-  git, the harness checks, search and the project's screenshot command, so instructions planted in the code it
-  reads cannot get it to run anything else.
+  git, the harness checks, search and the project's last-committed screenshot command, run from the project root,
+  and its browser checks open local addresses only, so instructions planted in the code it reads cannot get it to
+  run anything else or send anything out.
 - **Kickoff, with or without a mood board.** `/design-harness:kickoff` starts from a brief. It builds the mood board
   with you when there isn't one, or brings in what exists (a Claude Design artifact, a Figma file, a live site, a
   brand guide). It turns that into `PRODUCT.md`,
@@ -120,13 +122,18 @@ docs/benchmark.md                   method and results
 Pins are deliberate: an external skill changes only when its `sha` here is moved, after reading what changed, and a
 project changes harness version only when the `ref` tag in its `.claude/settings.json` is moved.
 
-To release: run the tests (`node --test tests/harness.test.mjs`), bump `version` in both manifests, update the `ref`
+To release: run the tests (`npm install` once, for the pinned TypeScript the checks parse with, then `npm test`), bump `version` in both manifests, update the `ref`
 in `skills/kickoff/templates/settings.json`, commit, and tag `vX.Y.Z`. Re-run the benchmark when the reviewer, its
 rules or its model change.
 
 ## What it does not cover yet
 
-- Windows: the dev-server proof uses `lsof` and the browser search knows macOS and Linux paths.
+- Anything but macOS, on purpose: the dev-server proof uses `lsof` and the browser search knows Mac paths first.
+- Fixes made after a review reach the next review, not this turn's: a second review of every fix would double the
+  wait for little.
+- Supply chain below the top level: the harness is pinned by a tag only its owner can move, external plugins by
+  commit, and the DESIGN.md linter by version, but the linter's own dependencies float, and Impeccable downloads a
+  binary on first use.
 - Copy length in Vue, Svelte and Astro files: the check names them instead of measuring them.
 - Route inference assumes file-based routing (Next.js); other routers need the route named by hand.
 - A day-one stack scaffold, CI workflow and preview deploys: the kickoff sets up identity and product files, not

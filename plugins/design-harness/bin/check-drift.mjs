@@ -20,18 +20,98 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseArg, changedFiles, loadConfig, matchesAny } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, changedFiles, loadConfig, matchesAny, projectRequire } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
 const base = baseArg(config, root)
 const scope = addedLines(root, base, config.ui)
+// The project's TypeScript, when it has one, finds strings exactly; without it a scanner stands in.
+const ts = projectRequire(root, 'typescript')
 
 const RULES = [
   ['colour', /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/],
   ['size', /\b[\w:-]+-\[(?:-?\d*\.?\d+(?:px|rem|em|vh|vw|%)|#[0-9a-fA-F]{3,8}|(?:rgba?|hsla?|oklch)\([^\]]*\))\]/],
   ['forced', /(?:^|[\s"'`])![a-z][\w:-]*|\b[a-z][\w-]*-[\w/.-]+!(?=[\s"'`]|$)|!important/],
 ]
+
+// The string content on each line of a component, template literals that span lines included. Matching quotes one line
+// at a time missed a class list written as a multi-line template literal, which is how long class lists get written.
+// A quote or apostrophe left open at a line end is JSX text ("Don't"), not a string: JavaScript does not let ' or "
+// strings cross lines, so the scan returns to code there. Comments are skipped; a ${} inside a template is code.
+function stringsByLine(lines) {
+  const out = new Map()
+  const add = (n, t) => t && (out.get(n) ?? out.set(n, []).get(n)).push(t)
+  let state = 'code'
+  const stack = []
+  for (let n = 1; n <= lines.length; n++) {
+    const line = lines[n - 1]
+    let buf = ''
+    if (state === "'" || state === '"') state = 'code'
+    if (state === 'line-comment') state = 'code'
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i]
+      if (state === 'block-comment') {
+        if (c === '*' && line[i + 1] === '/') (state = stack.pop() ?? 'code'), i++
+        continue
+      }
+      if (state === 'code') {
+        if (c === '/' && line[i + 1] === '/') break
+        if (c === '/' && line[i + 1] === '*') (stack.push('code'), (state = 'block-comment')), i++
+        // An apostrophe between letters is a word in JSX text ("Don't"), not a quote.
+        else if (c === "'" && /[A-Za-z]/.test(line[i - 1] ?? '') && /[A-Za-z]/.test(line[i + 1] ?? '')) continue
+        else if (c === "'" || c === '"' || c === '`') (state = c), (buf = '')
+        else if (c === '}' && stack.at(-1) === '`') (state = stack.pop()), (buf = '')
+        else if (c === '{' && stack.length) stack.push('{')
+        else if (c === '}' && stack.at(-1) === '{') stack.pop()
+        continue
+      }
+      // inside a string
+      if (c === '\\') {
+        buf += line.slice(i, i + 2)
+        i++
+      } else if (c === state) {
+        add(n, buf)
+        buf = ''
+        state = 'code'
+      } else if (state === '`' && c === '$' && line[i + 1] === '{') {
+        add(n, buf)
+        buf = ''
+        stack.push('`')
+        state = 'code'
+        i++
+      } else buf += c
+    }
+    if (state === '`') add(n, buf)
+  }
+  return out
+}
+
+// The same map from the parsed file: every string and template piece, split onto the lines it spans.
+function stringsByAst(file, src) {
+  const out = new Map()
+  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, /x$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const KINDS = new Set([
+    ts.SyntaxKind.StringLiteral,
+    ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+    ts.SyntaxKind.TemplateHead,
+    ts.SyntaxKind.TemplateMiddle,
+    ts.SyntaxKind.TemplateTail,
+  ])
+  const visit = (node) => {
+    if (KINDS.has(node.kind)) {
+      const start = node.getStart(sf)
+      const first = sf.getLineAndCharacterOfPosition(start).line + 1
+      src
+        .slice(start, node.getEnd())
+        .split('\n')
+        .forEach((piece, k) => (out.get(first + k) ?? out.set(first + k, []).get(first + k)).push(piece))
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return out
+}
 
 const findings = []
 let read = 0
@@ -43,13 +123,15 @@ for (const [file, lines] of scope) {
   } catch {
     continue
   }
+  // In a stylesheet the whole line is styling. In a component only strings are (class names, inline styles): reading
+  // the code too flagged `if (!paid)` as a forced override on the first the client prototype trial.
+  const stylesheet = /\.(css|scss|sass|less)$/.test(file)
+  const strings = stylesheet ? null : ts && /\.[jt]sx?$/.test(file) ? stringsByAst(file, text.join('\n')) : stringsByLine(text)
   text.forEach((line, i) => {
     if (lines !== 'all' && !lines.has(i + 1)) return
     read++
-    if (/drift-ok:/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) return
-    // In a stylesheet the whole line is styling. In a component only strings are (class names, inline styles):
-    // reading the code too flagged `if (!paid)` as a forced override on the first the client prototype trial.
-    const haystacks = /\.(css|scss|sass|less)$/.test(file) ? [line] : [...line.matchAll(/(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2])
+    if (/drift-ok:/.test(line) || (stylesheet && /^\s*(\/\/|\*|\/\*)/.test(line))) return
+    const haystacks = stylesheet ? [line] : (strings.get(i + 1) ?? [])
     for (const text of haystacks)
     for (const [kind, re] of RULES) {
       const m = text.match(re)

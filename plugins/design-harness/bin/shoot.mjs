@@ -7,17 +7,21 @@
  * those. A project with its own screenshot tool (personas, seeded state) names it in `screenshot` in
  * .claude/design-harness.json and the reviewer uses that instead.
  *
- * Usage: node shoot.mjs <url or /path> [more...]   (from the project root)
+ * Usage: node shoot.mjs <local url or /path> [more...]   (from the project root; local addresses only)
  * Prints the path of every image it wrote, in a temp folder.
  */
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULTS, loadConfig, openBrowser } from './lib.mjs'
+import { DEFAULTS, loadConfig, localTargets, openBrowser } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
-const targets = process.argv.slice(2).map((t) => (t.startsWith('http') ? t : new URL(t, config.devServer).href))
+const { targets, refused } = localTargets(process.argv.slice(2).filter((a) => !a.startsWith('--')), config)
+if (refused.length) {
+  console.log(`shoot: NOT RUN. Only local addresses are opened (localhost, 127.0.0.1, *.localhost); refused: ${refused.join(', ')}`)
+  process.exit(2)
+}
 // A browser that cannot start is a setup problem, not a finding: it used to throw, exit 1, and read as "violations
 // found" to the reviewer.
 let browser

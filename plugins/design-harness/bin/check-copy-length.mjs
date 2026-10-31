@@ -36,6 +36,8 @@ const ts = projectRequire(root, 'typescript')
 
 const LIMITS = {
   button: 4,
+  // A link inside a sentence reads with the sentence; measured as a button, every "Read the full policy" was noise.
+  link: 8,
   badge: 3,
   title: 6,
   subtitle: 10,
@@ -53,7 +55,7 @@ const TAG_KIND = {
   // Plain HTML too: the 2026-10-31 live trial added a native <button> with an 8-word label that only the reviewer
   // caught, because the list held component names alone.
   button: 'button',
-  a: 'button',
+  a: 'link',
   Button: 'button',
   Badge: 'badge',
   Heading: 'title',
@@ -111,11 +113,23 @@ function collect(file) {
     const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1
     found.push({ file, line, end, kind, text: clean, words: wordsOf(clean) })
   }
+  const measured = new Set()
   const visit = (node) => {
-    if (ts.isJsxElement(node)) {
+    if (ts.isJsxElement(node) && !measured.has(node)) {
       const kind = TAG_KIND[tagName(node.openingElement)]
       if (kind) {
-        const literal = node.children.filter((c) => ts.isJsxText(c) || (ts.isJsxExpression(c) && textOf(c)))
+        // `<Button asChild><Link>Save changes</Link></Button>`: the words sit one element down. Followed through an
+        // element with no kind of its own; under `asChild` the child IS this element, so it is followed whatever its
+        // tag and not measured again as itself.
+        const asChild = node.openingElement.attributes.properties.some((a) => ts.isJsxAttribute(a) && a.name.getText(sf) === 'asChild')
+        let holder = node
+        while (!holder.children.some((c) => ts.isJsxText(c) && textOf(c))) {
+          const inner = holder.children.filter((c) => ts.isJsxElement(c))
+          if (inner.length !== 1 || (!asChild && TAG_KIND[tagName(inner[0].openingElement)])) break
+          holder = inner[0]
+          if (asChild) measured.add(holder)
+        }
+        const literal = holder.children.filter((c) => ts.isJsxText(c) || (ts.isJsxExpression(c) && textOf(c)))
         if (literal.length) add(kind, node, literal.map(textOf).join(' '))
       }
     }

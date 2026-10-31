@@ -42,6 +42,14 @@ write and said so, and the turn took 30 seconds. An earlier trial found two faul
 the background by default (a review counts only once its report is back), and `decision: block` is shown as a hook
 error (the request is now `additionalContext`).
 
+The reviewer's shell limit, 2026-10-31, headless with the plugin loaded: the session allowed `git log`, `ls` and
+`touch /tmp/…` outright, then ran the reviewer and told it to run all three. `git log` and `ls` ran; the hook refused
+`touch` with its reason and no file appeared. The same `touch` from the main session ran. So the hook input does carry
+the calling agent's type, which the unit tests can only simulate.
+
+In eight real review reports, only one repeated its fingerprint as instructed, so the hook does not depend on it: a
+review counts when Claude Code records the call as completed, and an errored call does not.
+
 ## Limits
 
 Seven cases from one project, one run each, so run-to-run variance is unknown and 11 against 10 is noise. The cases

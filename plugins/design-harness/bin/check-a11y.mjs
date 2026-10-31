@@ -10,14 +10,19 @@
  * It uses the project's own browser library (Playwright with @axe-core/playwright, or Puppeteer with
  * @axe-core/puppeteer) and the dev server the project already runs. It never starts a server.
  *
- * Usage: node check-a11y.mjs <url or /path> [more...]   (from the project root; paths resolve against devServer)
+ * Usage: node check-a11y.mjs <local url or /path> [more...]   (from the project root; paths resolve against devServer;
+ *        local addresses only)
  * Exit: 0 no serious or critical violations · 1 found · 2 setup problem (named).
  */
-import { DEFAULTS, loadConfig, openBrowser } from './lib.mjs'
+import { DEFAULTS, loadConfig, localTargets, openBrowser } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
-const targets = process.argv.slice(2).map((t) => (t.startsWith('http') ? t : new URL(t, config.devServer).href))
+const { targets, refused } = localTargets(process.argv.slice(2).filter((a) => !a.startsWith('--')), config)
+if (refused.length) {
+  console.log(`a11y: NOT RUN. Only local addresses are opened (localhost, 127.0.0.1, *.localhost); refused: ${refused.join(', ')}`)
+  process.exit(2)
+}
 if (!targets.length) {
   console.log('a11y: name the pages to check, e.g. node check-a11y.mjs /settings /settings/billing')
   process.exit(2)
