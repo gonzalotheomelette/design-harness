@@ -1,0 +1,62 @@
+{
+  "name": "omelette",
+  "owner": {
+    "name": "Gonzalo Hernandez",
+    "url": "https://github.com/gonzalotheomelette"
+  },
+  "metadata": {
+    "description": "Omelette's design harness: a review-before-show loop for UI work, a mood-board kickoff, and the external design skills it builds on, each pinned to a commit that was read and checked."
+  },
+  "plugins": [
+    {
+      "name": "design-harness",
+      "source": "./plugins/design-harness",
+      "version": "0.1.0",
+      "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift and accessibility checks, a mood-board kickoff, and a learn skill that turns corrections into rules.",
+      "category": "design"
+    },
+    {
+      "name": "frontend-design",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/frontend-design",
+        "sha": "a7ba5b93db0c7c8d17f3f1d25853adca79598a1a"
+      },
+      "description": "Anthropic's frontend-design skill: plans a design, reviews the plan against the looks AI-generated design falls into, then builds. Used at kickoff and for anything new.",
+      "category": "design"
+    },
+    {
+      "name": "impeccable",
+      "source": {
+        "source": "git-subdir",
+        "url": "pbakaus/impeccable",
+        "path": "plugin",
+        "sha": "4f956490f0056ae1ff5ea80372cf56e83c001d3c"
+      },
+      "description": "Paul Bakaus's Impeccable: critique, audit, polish, distill and 20 more commands, with surface modes and a craft floor. Note: its detector downloads a binary on first use.",
+      "category": "design"
+    },
+    {
+      "name": "modern-web-guidance",
+      "source": {
+        "source": "github",
+        "repo": "GoogleChrome/modern-web-guidance",
+        "sha": "4f2b13e25c5815b3f080ca0d983e828d96561a0f"
+      },
+      "description": "Google Chrome's guides to what the web platform now does natively (dialogs, styled selects, anchor positioning, view transitions). Measured by its authors at +27 to +34 points on their task suite.",
+      "category": "development"
+    },
+    {
+      "name": "emil-design-engineering",
+      "source": {
+        "source": "github",
+        "repo": "emilkowalski/skills",
+        "sha": "a81dbca07f2217b7103e510c0f13f8d5b017afc9"
+      },
+      "strict": false,
+      "description": "Emil Kowalski's design-engineering skills: animate, review-animations, break-ui (worst-case data), prototype (variants behind a picker), mobile-native. The repo's whole skills folder loads, including a few platform skills (Expo, Swift).",
+      "category": "design"
+    }
+  ]
+}
