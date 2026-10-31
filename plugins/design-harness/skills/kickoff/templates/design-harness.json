@@ -10,7 +10,8 @@
     "**/theme.css",
     "**/tokens.css",
     "**/globals.css",
-    "DESIGN.md"
+    "DESIGN.md",
+    "design/**"
   ],
   "rules": "docs/ui-consistency.md",
   "design": "DESIGN.md",

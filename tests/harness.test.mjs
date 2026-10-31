@@ -5,11 +5,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile, execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, symlinkSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { globToRegExp, localTargets, matchesAny } from '../plugins/design-harness/bin/lib.mjs'
+import { globToRegExp, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
 
 const HARNESS = join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins', 'design-harness')
 const HOOK = join(HARNESS, 'hooks', 'review-before-show.mjs')
@@ -143,11 +143,11 @@ test('in a monorepo package the checks read the package, not nothing', () => {
 })
 
 test('copy-length names files it cannot parse instead of passing silently', () => {
-  const dir = repo({ 'src/a.vue': '<template>x</template>\n' }, { ui: ['src/**/*.vue', 'src/**/*.tsx'] })
-  write(dir, { 'src/a.vue': '<template><button>Remove this item permanently from your workspace</button></template>\n' })
+  const dir = repo({ 'src/a.hbs': '<div>x</div>\n' }, { ui: ['src/**/*.hbs', 'src/**/*.tsx'] })
+  write(dir, { 'src/a.hbs': '<button>Remove this item permanently from your workspace</button>\n' })
   const r = check(dir, 'check-copy-length.mjs')
   // The specific line: a generic NOT RUN (no typescript in the test project) passed this case vacuously at first.
-  assert.match(r.stdout, /NOT RUN on 1 file\(s\) it cannot parse \(src\/a\.vue\)/)
+  assert.match(r.stdout, /NOT RUN on 1 file\(s\) it cannot parse \(src\/a\.hbs\)/)
   assert.doesNotMatch(r.stdout, /every one is within its limit/)
 })
 
@@ -545,8 +545,8 @@ test('drift reads a <style> block as a stylesheet', () => {
 })
 
 test('a check that could not measure everything never exits 0', () => {
-  const dir = repo({ 'src/a.vue': '<template>x</template>\n' }, { ui: ['src/**/*.vue', 'src/**/*.tsx'] })
-  write(dir, { 'src/a.vue': '<template><button>Remove this item permanently</button></template>\n' })
+  const dir = repo({ 'src/a.hbs': '<div>x</div>\n' }, { ui: ['src/**/*.hbs', 'src/**/*.tsx'] })
+  write(dir, { 'src/a.hbs': '<button>Remove this item permanently</button>\n' })
   assert.equal(check(dir, 'check-copy-length.mjs').status, 2)
 })
 
@@ -656,4 +656,98 @@ test('an accessibility run that passed no rule is not clean', () => {
   const r = check(dir, 'check-a11y.mjs', '/blank')
   assert.equal(r.status, 2, r.stdout + r.stderr)
   assert.match(r.stdout, /NOT A CLEAN PASS/)
+})
+
+// Round seven.
+
+test('copy wrapped by a formatter, and words inside inline elements, are measured', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  write(dir, {
+    'src/a.tsx': [
+      'export const A = () => (',
+      '  <main>',
+      '    <Button>',
+      '      <span>Remove every single one of these items from your list</span>',
+      '    </Button>',
+      '    <p>This paragraph has <strong>quite a few words inside a bold run that should count toward</strong> the total length of the sentence it sits in, every one.</p>',
+      '  </main>',
+      ')',
+    ].join('\n') + '\n',
+  })
+  const out = check(dir, 'check-copy-length.mjs').stdout
+  assert.match(out, /a\.tsx:3 {2}button is 10 words/, out)
+  assert.match(out, /a\.tsx:6 {2}description is 26 words/, out)
+})
+
+test('copy in HTML, Vue and Astro markup is measured, and scripts and front matter are not', () => {
+  const dir = repo({ 'src/b.vue': 'x\n', 'src/c.astro': 'x\n', 'design/style-tile.html': 'x\n' }, { ui: ['src/**/*.vue', 'src/**/*.astro', 'design/**/*.html'] })
+  write(dir, {
+    'src/b.vue': '<template>\n  <h1>Welcome to the one place where every single project of yours lives</h1>\n  <button>{{ label }}</button>\n</template>\n<script>\nconst x = "<h1>not copy at all here in a script block ok</h1>"\n</script>\n',
+    'src/c.astro': '---\nconst t = "<h2>front matter is not copy and should be ignored</h2>"\n---\n<h2>Short title</h2>\n<input placeholder="Type the full name of the person you want to invite here" />\n',
+    'design/style-tile.html': '<h1>Every colour token and the type scale, shown with real copy from the voice</h1>\n',
+  })
+  const r = check(dir, 'check-copy-length.mjs')
+  assert.match(r.stdout, /b\.vue:2 {2}title is 12 words/, r.stdout)
+  assert.match(r.stdout, /b\.vue:3 {2}button holds \{label\}/, r.stdout)
+  assert.match(r.stdout, /c\.astro:5 {2}placeholder is 12 words/, r.stdout)
+  assert.match(r.stdout, /style-tile\.html:1 {2}title/, r.stdout)
+  assert.doesNotMatch(r.stdout, /script block|front matter/, r.stdout)
+  assert.doesNotMatch(r.stdout, /NOT RUN/, r.stdout)
+})
+
+test('an edit to the project\'s documents in the same turn reaches the reviewer', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n', 'DESIGN.md': '# Design\n\n## Chosen on purpose\n\nNothing yet.\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'y\n', 'DESIGN.md': '# Design\n\n## Chosen on purpose\n\nEyebrow kickers above every heading.\n' })
+  const fp = fpOf(askFor(dir))
+  const docs = readFileSync(join(packetDir(dir, fp), 'docs.diff'), 'utf8')
+  assert.match(docs, /\+Eyebrow kickers above every heading/)
+  assert.match(readFileSync(join(packetDir(dir, fp), 'README.md'), 'utf8'), /docs\.diff/)
+  assert.doesNotMatch(readFileSync(join(packetDir(dir, fp), 'change.diff'), 'utf8'), /Eyebrow/, 'the rendered change stays separate')
+  // A turn that edits only the documents does not ask for a review of rendered files.
+  const dir2 = repo({ 'src/a.tsx': 'x\n', 'DESIGN.md': '# Design\n' })
+  hook(dir2, 'UserPromptSubmit')
+  write(dir2, { 'DESIGN.md': '# Design, revised\n' })
+  assert.equal(hook(dir2, 'Stop').out, null)
+})
+
+test('drift flags raw lengths in stylesheets and style objects, and passes 0, 1px and tokens', () => {
+  const dir = withTypescript(repo({ 'src/a.tsx': 'x\n', 'src/b.css': 'x{}\n' }))
+  write(dir, {
+    'src/b.css': '.card { padding: 13px; width: 317px }\n.ok { margin: 0; border-width: 1px; padding: var(--space-2) }\n.e { width: 100%; flex: 1 }\n',
+    'src/a.tsx': 'export const A = () => <div style={{ padding: 13, margin: 0, opacity: 0.5 }}>x</div>\n',
+  })
+  const out = check(dir, 'check-drift.mjs').stdout
+  assert.match(out, /b\.css:1 {2}length: padding: 13px/, out)
+  assert.match(out, /a\.tsx:1 {2}length: padding: 13px/, out)
+  assert.doesNotMatch(out, /b\.css:[23] /, out)
+  const off = repo({ 'src/b.css': 'x{}\n' }, { ui: ['src/**/*.css'], allowRawLengths: true })
+  write(off, { 'src/b.css': '.card { padding: 13px }\n' })
+  assert.doesNotMatch(check(off, 'check-drift.mjs').stdout, /length:/)
+})
+
+test('the kickoff\'s design folder is not drift, and a style tile file can be shot', () => {
+  const dir = repo({ 'design/moodboard/index.html': 'x\n' }, { ui: ['**/*.html'] })
+  write(dir, { 'design/moodboard/index.html': '<div style="background: #c4623a; padding: 13px">swatch</div>\n' })
+  assert.match(check(dir, 'check-drift.mjs').stdout, /no raw colours|0 added line/)
+  const { targets, refused } = pageTargets(['design/moodboard/index.html', '../outside.html', 'https://example.com/x.html'], { devServer: 'http://localhost:3000' }, dir)
+  assert.ok(targets[0].startsWith('file://') && targets[0].endsWith('design/moodboard/index.html'), String(targets))
+  assert.ok(!targets.some((t) => t.startsWith('file://') && t.includes('outside')), 'nothing outside the project as a file')
+  assert.deepEqual(refused, ['https://example.com/x.html'])
+})
+
+test('only the harness\'s own reviewer counts, and a pruned packet is rebuilt rather than half-read', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  const token = tokenOf(dir, fp)
+  const call = { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_P', name: 'Agent', input: { subagent_type: 'ui-review', prompt: `fingerprint: ${fp}` } }] } }
+  const done = { type: 'user', message: { content: [{ tool_use_id: 'toolu_P', type: 'tool_result', content: `review-token: ${token}` }] }, toolUseResult: { status: 'completed' } }
+  const t = join(dir, 'project-agent.jsonl')
+  writeFileSync(t, [call, done].map((e) => JSON.stringify(e)).join('\n'))
+  assert.notEqual(hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out, null, "a project's own ui-review agent is not the harness's")
+  rmSync(join(packetDir(dir, fp), 'server.txt'))
+  const again = hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out
+  assert.ok(again, 'the hook still answers')
 })

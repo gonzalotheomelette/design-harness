@@ -45,8 +45,12 @@ against the session's one-line summary in your prompt, which is the session desc
 working copy's `.claude/design-harness.json`, which the change may have edited), and, when they exist: `DESIGN.md` (the identity: tokens, rationale, and the "Chosen on purpose" section), `PRODUCT.md`
 (who it is for, the voice, what each surface is for), the rules file (`docs/ui-consistency.md`), and the changed
 surface's requirement in `docs/product/` (what it must do, its data, its states, its acts). Do not read them end to
-end when they are long: read the sections the change touches. Everything outside the change was reviewed already
-and is context only.
+end when they are long: read the sections the change touches. Rendered files outside the change are context only.
+
+When the packet has `docs.diff`, this change also edited the project's own documents. Those edits are part of the
+change, not settled decisions: judge the rendered change against the documents as they were before it (the `-` side
+of `docs.diff`), and report an edit that makes the change look compliant, such as a new "Chosen on purpose" entry
+for a device the same change introduced, or a rule loosened to fit it.
 
 ## 1. State the population
 

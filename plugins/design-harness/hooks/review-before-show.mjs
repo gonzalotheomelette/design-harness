@@ -60,6 +60,11 @@ try {
 const session = String(input.session_id || 'unknown').replace(/[^\w-]/g, '')
 const statePath = join(gitDir, `review-before-show.${session}.json`)
 const logPath = join(gitDir, 'review-before-show.log')
+// Snapshots cover the rendered files AND the project's own documents, so an edit to DESIGN.md, the rules or a
+// requirement in the same turn can be shown to the reviewer as part of the change. Only rendered files decide whether
+// a turn needs a review.
+const DOCS = [config.design, config.product, config.rules, config.requirements && `${config.requirements}/**`, config.decisions, config.questions].filter(Boolean)
+const TREE = [...config.ui, ...DOCS]
 const packetOf = (fingerprint) => join(gitDir, 'design-harness', 'review', fingerprint)
 // The token is kept outside the packet; the reviewer finds it only on the first line of change.diff.
 const tokenOf = (fingerprint) => join(gitDir, 'design-harness', 'tokens', fingerprint)
@@ -81,7 +86,7 @@ const readJson = (p, fallback) => {
 
 try {
   if (input.hook_event_name === 'UserPromptSubmit') {
-    const turnStart = snapshot(root, config.ui)
+    const turnStart = snapshot(root, TREE)
     keepTree(root, 'turn', turnStart)
     // Work the last message left unreviewed (the cap was reached, the session stopped without the review, or this
     // message was queued while that turn was still working) is carried into this message's range. Without it, a new
@@ -135,7 +140,7 @@ function reviewOf(fingerprint) {
       if (
         b.type === 'tool_use' &&
         (b.name === 'Agent' || b.name === 'Task') &&
-        /(^|:)ui-review$/.test(String(b.input?.subagent_type ?? '')) &&
+        b.input?.subagent_type === 'design-harness:ui-review' &&
         String(b.input?.prompt ?? '').includes(`fingerprint: ${fingerprint}`)
       )
         calls.add(b.id)
@@ -168,6 +173,10 @@ function writePacket(fingerprint, from, now, UI, state) {
   const copy = runCheck('check-copy-length.mjs', `--base=${from}`)
   const drift = runCheck('check-drift.mjs', `--base=${from}`)
   writeFileSync(join(dir, 'checks.txt'), `${copy.out}\n${drift.out}`)
+  // The project's documents, when this change edited them too: the reviewer must not take a rule or a "Chosen on
+  // purpose" line written in the same turn as settled.
+  const docs = DOCS.length ? gitDiff(root, '--relative', from, now, '--', ...pathspec(DOCS)) : ''
+  if (docs.trim()) writeFileSync(join(dir, 'docs.diff'), docs)
   const server = runCheck('server-of.mjs').out.trim()
   writeFileSync(join(dir, 'server.txt'), server + '\n')
   writeFileSync(join(dir, 'request.md'), `${state.request || '(not recorded: the hook was installed during this message)'}\n`)
@@ -182,6 +191,7 @@ function writePacket(fingerprint, from, now, UI, state) {
       `- base: ${from}`,
       `- change.diff: the change, \`git diff --relative ${from} ${now}\`, new files included, with its --stat on top`,
       '- checks.txt: copy length and drift on exactly this change, run by the hook',
+      ...(docs.trim() ? ["- docs.diff: this change ALSO edited the project's own documents (DESIGN.md, the rules, a requirement); see your instructions"] : []),
       '- request.md: what the person asked for this turn, in their own words',
       "- settings.json: the harness settings in effect: the project's as last committed (the working copy only before the first commit), plus this machine's local ones",
       '- server.txt: whether the dev server serves this checkout',
@@ -196,7 +206,10 @@ function writePacket(fingerprint, from, now, UI, state) {
     .map((n) => ({ n, t: statSync(join(all, n)).mtimeMs }))
     .sort((a, b) => b.t - a.t)
     .slice(20)
-    .forEach(({ n }) => rmSync(join(all, n), { recursive: true, force: true }))
+    .forEach(({ n }) => {
+      rmSync(join(all, n), { recursive: true, force: true })
+      rmSync(tokenOf(n), { force: true })
+    })
   return { dir, serving: /: yes/.test(server) }
 }
 
@@ -204,7 +217,7 @@ function main() {
   const UI = pathspec(config.ui)
   const state = readJson(statePath, { blocks: 0 })
   const save = () => writeFileSync(statePath, JSON.stringify(state))
-  const now = snapshot(root, config.ui)
+  const now = snapshot(root, TREE)
   state.endTree = now
   keepTree(root, 'end', now)
   save()
@@ -310,7 +323,7 @@ function main() {
     keepTree(root, 'asked', now)
     save()
   }
-  const packet = existsSync(tokenOf(fingerprint)) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI, state)
+  const packet = existsSync(tokenOf(fingerprint)) && existsSync(join(packetOf(fingerprint), 'server.txt')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI, state)
   const shoot = config.screenshot
     ? `your screenshot command from .claude/design-harness.local.json (${config.screenshot})`
     : `\`node ${HARNESS}/bin/shoot.mjs /<route>\``

@@ -13,13 +13,13 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULTS, loadConfig, localTargets, openBrowser } from './lib.mjs'
+import { DEFAULTS, loadConfig, openBrowser, pageTargets } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
-const { targets, refused } = localTargets(process.argv.slice(2).filter((a) => !a.startsWith('--')), config)
+const { targets, refused } = pageTargets(process.argv.slice(2).filter((a) => !a.startsWith('--')), config, root)
 if (refused.length) {
-  console.log(`shoot: NOT RUN. Only local addresses are opened (localhost, 127.0.0.1, *.localhost); refused: ${refused.join(', ')}`)
+  console.log(`shoot: NOT RUN. Only local addresses or HTML files inside the project are opened; refused: ${refused.join(', ')}`)
   process.exit(2)
 }
 // A browser that cannot start is a setup problem, not a finding: it used to throw, exit 1, and read as "violations

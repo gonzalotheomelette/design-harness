@@ -14,9 +14,10 @@
  * element, and it needs a reason. Most wordiness (a sentence explaining the interface) fits inside any sane
  * limit, so this is a floor under the reviewer, never the judge.
  *
- * It parses with the project's own TypeScript, so `<Button>Save</Button>`, `title="..."` on any element and
- * `toast('...')` are each recognised for what they are. A template expression counts as one word. A ternary
- * counts its longer branch.
+ * JSX is parsed with the TypeScript that ships with the harness, so `<Button>Save</Button>`, `title="..."` on any
+ * element and `toast('...')` are each recognised for what they are. A template expression counts as one word. A
+ * ternary counts its longer branch. Words inside inline elements (`<strong>`, `<em>`, a link in a sentence) count
+ * toward their sentence. HTML, Vue, Svelte and Astro markup is read by a smaller tag reader with the same kinds.
  *
  * Usage: node check-copy-length.mjs [--all | --survey | --base=<ref>]   (run from the project root)
  * Exit: 0 clean · 1 a string is over its limit · 2 not a clean pass: something it could not measure, named, or a
@@ -98,7 +99,11 @@ const TAG_KIND = {
 }
 // Copy carried in a prop, on any element.
 const ATTR_KIND = { title: 'title', subtitle: 'subtitle', description: 'description', hint: 'description', caption: 'description', label: 'label', placeholder: 'placeholder' }
-const COPY_FILES = config.copyFiles ?? ['**/*.tsx', '**/*.jsx']
+const JSX_FILES = config.copyFiles ?? ['**/*.tsx', '**/*.jsx']
+const MARKUP_FILES = ['**/*.html', '**/*.vue', '**/*.svelte', '**/*.astro']
+const COPY_FILES = [...JSX_FILES, ...MARKUP_FILES]
+// Elements whose words belong to the sentence around them.
+const INLINE = new Set(['strong', 'em', 'b', 'i', 'u', 'code', 'span', 'a', 'Link', 'mark', 'abbr', 'kbd', 'sub', 'sup', 'q', 'time', 'Strong', 'Code', 'TextLink'])
 const EXCLUDE = config.copyExclude ?? ['**/*.test.*', '**/*.stories.*', '**/node_modules/**']
 
 const wordsOf = (t) => t.trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length
@@ -143,7 +148,39 @@ function textOf(node) {
 }
 const tagName = (el) => (ts.isIdentifier(el.tagName) ? el.tagName.text : ts.isPropertyAccessExpression(el.tagName) ? el.tagName.name.text : '')
 
+// Markup files: the same kinds, read from tags. Scripts, styles and Astro's front matter are left out; a `{...}`
+// expression in the text is a slot it cannot read, reported as unmeasured when it is all the text there is.
+const HTML_KIND = Object.fromEntries(Object.entries(TAG_KIND))
+function collectMarkup(file) {
+  let src = readFileSync(join(root, file), 'utf8')
+  const blank = (m) => m.replace(/[^\n]/g, ' ')
+  src = src.replace(/<script[\s\S]*?<\/script>/gi, blank).replace(/<style[\s\S]*?<\/style>/gi, blank)
+  if (file.endsWith('.astro')) src = src.replace(/^---[\s\S]*?\n---/, blank)
+  const lineAt = (i) => src.slice(0, i).split('\n').length
+  const found = []
+  const tags = Object.keys(HTML_KIND).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const re = new RegExp(`<(${tags.join('|')})(\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>`, 'g')
+  for (const m of src.matchAll(re)) {
+    const kind = HTML_KIND[m[1]]
+    const inner = m[3]
+    const EXPR = /\{\{[\s\S]*?\}\}|\{[^}]*\}/g
+    const exprs = inner.match(EXPR) ?? []
+    const text = inner.replace(EXPR, ' X ').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;|&#\d+;/g, ' ').replace(/\s+/g, ' ').trim()
+    const line = lineAt(m.index)
+    const end = lineAt(m.index + m[0].length)
+    const words = text.replace(/\bX\b/g, '').trim()
+    if (/[A-Za-z]/.test(words)) found.push({ file, line, end, kind, text, words: wordsOf(text) })
+    else if (exprs.length) found.push({ file, line, end, kind, opaque: exprs[0].replace(/^\{+|\}+$/g, '').trim() })
+  }
+  for (const m of src.matchAll(/\s(title|placeholder|aria-label|alt)="([^"]{1,400})"/g)) {
+    const kind = m[1] === 'placeholder' ? 'placeholder' : m[1] === 'title' ? 'title' : null
+    if (kind && /[A-Za-z]/.test(m[2])) found.push({ file, line: lineAt(m.index), end: lineAt(m.index), kind, text: m[2], words: wordsOf(m[2]) })
+  }
+  return found
+}
+
 function collect(file) {
+  if (matchesAny(file, MARKUP_FILES)) return collectMarkup(file)
   const src = readFileSync(join(root, file), 'utf8')
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, /x$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const found = []
@@ -182,15 +219,26 @@ function collect(file) {
         // element with no kind of its own; under `asChild` the child IS this element, so it is followed whatever its
         // tag and not measured again as itself.
         const asChild = node.openingElement.attributes.properties.some((a) => ts.isJsxAttribute(a) && a.name.getText(sf) === 'asChild')
+        // Whitespace-only text is the line breaks a formatter puts around a wrapped child; it is not copy, and treating
+        // it as copy stopped the walk before the words, so a wrapped label was never measured.
         let holder = node
-        while (!holder.children.some((c) => ts.isJsxText(c) && textOf(c))) {
+        while (!holder.children.some((c) => ts.isJsxText(c) && textOf(c).trim())) {
           const inner = holder.children.filter((c) => ts.isJsxElement(c))
           if (inner.length !== 1 || (!asChild && TAG_KIND[tagName(inner[0].openingElement)])) break
           holder = inner[0]
           if (asChild) measured.add(holder)
         }
-        const parts = holder.children.filter((c) => ts.isJsxText(c) || ts.isJsxExpression(c))
-        if (parts.length) add(kind, node, () => parts.map(textOf).join(' '))
+        const inline = (el) =>
+          el.children
+            .map((c) =>
+              ts.isJsxText(c) || ts.isJsxExpression(c)
+                ? textOf(c)
+                : ts.isJsxElement(c) && INLINE.has(tagName(c.openingElement))
+                  ? inline(c)
+                  : '',
+            )
+            .join(' ')
+        if (holder.children.length) add(kind, node, () => inline(holder))
       }
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
@@ -227,18 +275,23 @@ if (ALL) {
     console.log(`copy-length: NOT A CLEAN PASS. git lists ${listed.length} changed file(s) but none could be read; check their copy by hand.`)
     process.exit(2)
   }
-  // Rendered files this parser cannot read (Vue, Svelte, Astro): name them, so silence is never read as a pass.
-  const unreadable = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, COPY_FILES) && !/\.(css|scss)$/.test(f))
+  // Rendered files it cannot read: name them, so silence is never read as a pass. Stylesheets hold no copy.
+  const unreadable = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, COPY_FILES) && !/\.(css|scss|sass|less)$/.test(f))
   if (unreadable.length) {
     notClean = true
     console.log(`copy-length: NOT RUN on ${unreadable.length} file(s) it cannot parse (${unreadable.slice(0, 5).join(', ')}); read their copy by hand.`)
   }
 }
 files = files.filter((f) => existsSync(join(root, f)) && !matchesAny(f, EXCLUDE))
-if (!ts) {
-  if (files.length) console.log(`copy-length: NOT RUN on ${files.length} file(s): this project has no typescript package to parse with (npm i -D typescript).`)
-  else console.log('copy-length: nothing it can parse changed')
-  process.exit(files.length || notClean ? 2 : 0)
+const jsx = files.filter((f) => matchesAny(f, JSX_FILES))
+if (!ts && jsx.length) {
+  notClean = true
+  console.log(`copy-length: NOT RUN on ${jsx.length} JSX file(s): the harness's TypeScript (bin/vendor) could not be loaded; reinstall the plugin.`)
+  files = files.filter((f) => !jsx.includes(f))
+}
+if (!files.length) {
+  console.log('copy-length: nothing it can parse changed')
+  process.exit(notClean ? 2 : 0)
 }
 
 let items = files.flatMap(collect)

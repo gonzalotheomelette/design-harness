@@ -14,6 +14,9 @@
  *            A project whose tokens ARE Tailwind's palette sets `"allowPalette": true`
  *   size     a Tailwind arbitrary value holding a length, calc() or colour (`p-[13px]`, `grid-cols-[200px_1fr]`,
  *            `w-[calc(100%-13px)]`, `text-[#333]`)
+ *   length   a raw length on a spacing, size, type or radius property in a stylesheet or a style object
+ *            (`padding: 13px`, `{ width: 317 }`); 0 and 1px pass. A project whose stylesheets are written in raw
+ *            lengths on purpose sets `"allowRawLengths": true`
  *   forced   an important override (`!text-red-700`, `text-red-700!`, `!important`): the component lost and was
  *            beaten at the call site instead of fixed where it lives
  *
@@ -40,6 +43,17 @@ const NAMED =
   'gainsboro|lightgray|lightgrey|darkgray|darkgrey|dimgray|slategray|snow|linen'
 const PALETTE =
   'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose'
+// Spacing, size, type and radius properties, the ones a token scale covers.
+const LENGTH_PROPS =
+  'padding|margin|gap|row-gap|column-gap|inset|top|right|bottom|left|width|height|min-width|min-height|max-width|' +
+  'max-height|font-size|line-height|letter-spacing|border-radius|border-width|outline-offset|flex-basis'
+function rawLength(text) {
+  for (const m of text.matchAll(new RegExp(`(?:^|[\\s;{])((?:${LENGTH_PROPS})(?:-[a-z]+)*)\\s*:\\s*([^;{}]*)`, 'gi'))) {
+    const bad = [...m[2].matchAll(/(?<![\w.#-])(\d*\.?\d+)(px|rem|em)\b/g)].find(([, n, u]) => Number(n) !== 0 && !(Number(n) === 1 && u === 'px'))
+    if (bad) return [`${m[1]}: ${bad[0]}`]
+  }
+  return null
+}
 const RULES = [
   ['size', /\b[\w:-]+-\[[^\]\s]*?(?:\d(?:px|rem|em|vh|vw|svh|dvh|lvh|ch|%)|calc\(|#[0-9a-fA-F]{3,8}|(?:rgba?|hsla?|oklch)\()[^\]\s]*\]/],
   ['colour', /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/],
@@ -48,6 +62,7 @@ const RULES = [
     ? []
     : [['palette', new RegExp(`(?:^|[\\s"'\`:])(?:bg|text|border|ring|ring-offset|fill|stroke|from|via|to|outline|decoration|divide|placeholder|caret|accent|shadow)-(?:${PALETTE})-(?:50|[1-9]00|950)(?:/\\d+)?(?=$|[\\s"'\`])`)]]),
   ['forced', /(?:^|[\s"'`])![a-z][\w:-]*|\b[a-z][\w-]*-[\w/.-]+!(?=[\s"'`]|$)|!important/],
+  ...(config.allowRawLengths ? [] : [['length', rawLength]]),
 ]
 
 // The string content on each line of a component, template literals that span lines included. Matching quotes one line
@@ -128,6 +143,15 @@ function stringsByAst(file, src) {
   }
   const visit = (node) => {
     // A colour property in a style object: `{ color: 'red' }` reads as the line a stylesheet would have.
+    // A length in a style object reads as the stylesheet line it stands for; React treats a bare number as px.
+    if (ts.isPropertyAssignment(node) && (ts.isNumericLiteral(node.initializer) || ts.isStringLiteralLike(node.initializer))) {
+      const prop = node.name.getText(sf).replace(/['"]/g, '').replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
+      if (new RegExp(`^(${LENGTH_PROPS})(-[a-z]+)*$`).test(prop)) {
+        const value = ts.isNumericLiteral(node.initializer) ? `${node.initializer.text}px` : node.initializer.text
+        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
+        ;(out.get(line) ?? out.set(line, []).get(line)).push(`${prop}: ${value}`)
+      }
+    }
     if (ts.isPropertyAssignment(node) && ts.isStringLiteralLike(node.initializer) && /colou?r|background|fill|stroke|border|outline/i.test(node.name.getText(sf))) {
       const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
       ;(out.get(line) ?? out.set(line, []).get(line)).push(`color: ${node.initializer.text}`)
@@ -195,7 +219,7 @@ for (const [file, lines] of scope) {
     const haystacks = sheet ? [css.get(i + 1)] : (strings.get(i + 1) ?? [])
     for (const text of haystacks)
     for (const [kind, re] of RULES) {
-      const m = text.match(re)
+      const m = typeof re === 'function' ? re(text) : text.match(re)
       // One finding per line: `text-[#d00]` is both an arbitrary value and a raw colour, and saying it twice is noise.
       if (m) {
         findings.push(`  ${file}:${i + 1}  ${kind}: ${m[0].trim()}`)

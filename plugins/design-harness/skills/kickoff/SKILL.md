@@ -170,7 +170,8 @@ Copy from `templates/`:
   stays under 200 lines.
 
 For a JavaScript project, ask before adding the dev dependencies the checks use:
-`npm i -D typescript playwright @axe-core/playwright && npx playwright install chromium`.
+`npm i -D playwright @axe-core/playwright && npx playwright install chromium`. The copy and drift checks need
+nothing installed: they parse with the TypeScript that ships with the harness.
 
 Tell the person that external plugins enabled in project settings need one install each, once per machine:
 `claude plugin install <name>@omelette --scope project` for each plugin the settings list.

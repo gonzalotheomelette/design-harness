@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { gunzipSync } from 'node:zlib'
-import { dirname, isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { createRequire } from 'node:module'
 
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -18,7 +18,8 @@ export const DEFAULTS = {
   // drift. Markdown content (.mdx) is prose, not interface copy.
   ui: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/*.html', '**/*.css', '**/*.scss', '**/*.sass', '**/*.less'],
   // Files allowed to hold raw colour values and arbitrary sizes: the theme the tokens are written into.
-  themeFiles: ['**/theme.css', '**/tokens.css', '**/globals.css', '**/tailwind.css', 'DESIGN.md'],
+  // design/ holds the mood board and the style tile, which show raw swatches on purpose.
+  themeFiles: ['**/theme.css', '**/tokens.css', '**/globals.css', '**/tailwind.css', 'DESIGN.md', 'design/**'],
   rules: 'docs/ui-consistency.md',
   design: 'DESIGN.md',
   product: 'PRODUCT.md',
@@ -244,6 +245,21 @@ export function localTargets(args, config) {
     else refused.push(a)
   }
   return { targets, refused }
+}
+// The same, where a page can also be an HTML file inside the project (a style tile built before there is an app,
+// `design/style-tile.html`), opened as file://. Nothing outside the project.
+export function pageTargets(args, config, root) {
+  const files = []
+  const rest = []
+  for (const a of args) {
+    if (/\.html?$/i.test(a) && !/^[a-z]+:/i.test(a)) {
+      const full = resolvePath(root, a)
+      if (full.startsWith(resolvePath(root) + '/') && existsSync(full)) files.push(`file://${full}`)
+      else rest.push(a)
+    } else rest.push(a)
+  }
+  const { targets, refused } = localTargets(rest, config)
+  return { targets: [...files, ...targets], refused }
 }
 
 // The TypeScript the checks parse with ships with the harness, so the hook never runs code from the repository it is

@@ -14,13 +14,13 @@
  *        local addresses only)
  * Exit: 0 no serious or critical violations · 1 found · 2 setup problem (named).
  */
-import { DEFAULTS, loadConfig, localTargets, openBrowser } from './lib.mjs'
+import { DEFAULTS, loadConfig, openBrowser, pageTargets } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
-const { targets, refused } = localTargets(process.argv.slice(2).filter((a) => !a.startsWith('--')), config)
+const { targets, refused } = pageTargets(process.argv.slice(2).filter((a) => !a.startsWith('--')), config, root)
 if (refused.length) {
-  console.log(`a11y: NOT RUN. Only local addresses are opened (localhost, 127.0.0.1, *.localhost); refused: ${refused.join(', ')}`)
+  console.log(`a11y: NOT RUN. Only local addresses or HTML files inside the project are opened; refused: ${refused.join(', ')}`)
   process.exit(2)
 }
 if (!targets.length) {
