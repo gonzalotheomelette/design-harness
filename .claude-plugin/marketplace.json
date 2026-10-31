@@ -11,7 +11,7 @@
     {
       "name": "design-harness",
       "source": "./plugins/design-harness",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift and accessibility checks, a mood-board kickoff, and a learn skill that turns corrections into rules.",
       "category": "design"
     },

@@ -10,7 +10,9 @@ designer before a reviewer has compared it with what already exists.
   fresh-context reviewer has read that exact change. The reviewer compares each surface with its closest sibling,
   checks the project's settled rules and an AI-look register, measures copy length against the project's approved
   copy, checks token drift and accessibility, and reports. The session fixes what it agrees with and says what it
-  left. Later reviews read only what changed since the last one.
+  left. Later reviews read only what changed since the last one. The reviewer's shell is limited to read-only
+  git, the harness checks, search and the project's screenshot command, so instructions planted in the code it
+  reads cannot get it to run anything else.
 - **Kickoff, with or without a mood board.** `/design-harness:kickoff` starts from a brief. It builds the mood board
   with you when there isn't one, or brings in what exists (a Claude Design artifact, a Figma file, a live site, a
   brand guide). It turns that into `PRODUCT.md`,
@@ -99,7 +101,7 @@ your-project/
 ```
 .claude-plugin/marketplace.json     the "omelette" marketplace: design-harness plus the pinned external plugins
 plugins/design-harness/
-  hooks/                            review-before-show (Stop + UserPromptSubmit)
+  hooks/                            review-before-show (Stop + UserPromptSubmit), reviewer-shell (PreToolUse)
   agents/ui-review.md               the reviewer (Sonnet: as accurate as Opus in the benchmark, and faster)
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface

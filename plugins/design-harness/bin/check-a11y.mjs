@@ -22,7 +22,15 @@ if (!targets.length) {
   console.log('a11y: name the pages to check, e.g. node check-a11y.mjs /settings /settings/billing')
   process.exit(2)
 }
-const browser = await openBrowser(root, config)
+// A browser that cannot start is a setup problem, not a finding: it used to throw, exit 1, and read as "violations
+// found" to the reviewer.
+let browser
+try {
+  browser = await openBrowser(root, config)
+} catch (e) {
+  console.log(`a11y: NOT RUN. The browser could not start: ${String(e.message ?? e).split('\n')[0]}`)
+  process.exit(2)
+}
 if (!browser || !browser.hasAxe) {
   console.log(
     'a11y: NOT RUN. Add a browser and axe: npm i -D playwright @axe-core/playwright && npx playwright install chromium' +

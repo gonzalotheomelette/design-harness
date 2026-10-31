@@ -18,7 +18,15 @@ import { DEFAULTS, loadConfig, openBrowser } from './lib.mjs'
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
 const targets = process.argv.slice(2).map((t) => (t.startsWith('http') ? t : new URL(t, config.devServer).href))
-const browser = await openBrowser(root, config)
+// A browser that cannot start is a setup problem, not a finding: it used to throw, exit 1, and read as "violations
+// found" to the reviewer.
+let browser
+try {
+  browser = await openBrowser(root, config)
+} catch (e) {
+  console.log(`shoot: NOT RUN. The browser could not start: ${String(e.message ?? e).split('\n')[0]}`)
+  process.exit(2)
+}
 if (!browser) {
   console.log('shoot: NOT RUN. The project has neither playwright nor puppeteer (npm i -D playwright).')
   process.exit(2)
