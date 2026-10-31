@@ -19,7 +19,7 @@
       "name": "frontend-design",
       "source": {
         "source": "git-subdir",
-        "url": "anthropics/claude-plugins-official",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
         "path": "plugins/frontend-design",
         "sha": "a7ba5b93db0c7c8d17f3f1d25853adca79598a1a"
       },
@@ -30,7 +30,7 @@
       "name": "impeccable",
       "source": {
         "source": "git-subdir",
-        "url": "pbakaus/impeccable",
+        "url": "https://github.com/pbakaus/impeccable.git",
         "path": "plugin",
         "sha": "4f956490f0056ae1ff5ea80372cf56e83c001d3c"
       },
