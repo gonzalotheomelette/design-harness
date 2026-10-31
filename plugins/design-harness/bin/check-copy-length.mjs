@@ -147,6 +147,11 @@ if (ALL) {
   const base = baseArg(config, root)
   scope = addedLines(root, base, COPY_FILES)
   files = [...scope.keys()]
+  const listed = changedFiles(root, base, COPY_FILES).filter((f) => !matchesAny(f, EXCLUDE))
+  if (listed.length && !files.length) {
+    console.log(`copy-length: NOT A CLEAN PASS. git lists ${listed.length} changed file(s) but none could be read; check their copy by hand.`)
+    process.exit(0)
+  }
   // Rendered files this parser cannot read (Vue, Svelte, Astro): name them, so silence is never read as a pass.
   const unreadable = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, COPY_FILES) && !/\.(css|scss)$/.test(f))
   if (unreadable.length) console.log(`copy-length: NOT RUN on ${unreadable.length} file(s) it cannot parse (${unreadable.slice(0, 5).join(', ')}); read their copy by hand.`)

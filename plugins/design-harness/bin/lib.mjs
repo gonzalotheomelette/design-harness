@@ -2,7 +2,7 @@
 // file, and what the branch is compared against. One place, so the hook and the checks never disagree about
 // which change they are looking at.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, statSync, utimesSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { createRequire } from 'node:module'
 
@@ -30,28 +30,73 @@ export const DEFAULTS = {
 }
 
 // The default output buffer (1 MB) is smaller than the diff of one large refactor, and the hook then threw on every
-// stop. 256 MB is far past any diff worth reviewing.
+// stop. 256 MB is far past any diff worth reviewing. `core.quotePath=false` keeps non-ASCII paths readable.
 export function git(root, ...args) {
-  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 })
+  return execFileSync('git', ['-c', 'core.quotePath=false', ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    maxBuffer: 256 * 1024 * 1024,
+  })
 }
+
+// Every diff the harness parses goes through here. A user's `diff.noprefix`, `diff.external` (difftastic and the
+// like) or colour settings changed the output the parser expects, and the checks then read nothing and passed.
+export const gitDiff = (root, ...args) => git(root, 'diff', '--no-ext-diff', '--no-color', '--src-prefix=a/', '--dst-prefix=b/', ...args)
 
 export function gitDirOf(root) {
   const d = git(root, 'rev-parse', '--git-dir').trim()
   return isAbsolute(d) ? d : join(root, d)
 }
 
-// The working state as a tree object, untracked files included, written through a scratch index so the real one is
-// untouched. Every check compares trees, so a new file, an edit and a monorepo subfolder all read the same way.
-export function snapshot(root) {
-  const env = { ...process.env, GIT_INDEX_FILE: join(gitDirOf(root), 'design-harness.index') }
-  const run = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })
-  try {
-    run('read-tree', 'HEAD')
-  } catch {
-    run('read-tree', '--empty')
+// Folders that are never the product's rendered source, excluded from every pathspec even where a project has no
+// .gitignore yet (a new project's node_modules was otherwise hashed into every snapshot).
+const NEVER = ['**/node_modules/**', '**/.next/**', '**/dist/**', '**/build/**', '**/.turbo/**', '**/coverage/**']
+export const pathspec = (globs) => [...globs.map((g) => `:(glob)${g}`), ...NEVER.map((g) => `:(exclude,glob)${g}`)]
+
+// The working state of the rendered files as a tree object, untracked files included, written through a scratch
+// index so the real one is untouched. It starts from a copy of the real index, so git reuses its record of which
+// files are unchanged instead of re-hashing the project, and adds only the rendered files.
+export function snapshot(root, globs = DEFAULTS.ui) {
+  const gitDir = gitDirOf(root)
+  const scratch = join(gitDir, 'design-harness.index')
+  const real = git(root, 'rev-parse', '--git-path', 'index').trim()
+  const realPath = isAbsolute(real) ? real : join(root, real)
+  const env = { ...process.env, GIT_INDEX_FILE: scratch }
+  const run = (args, input) =>
+    execFileSync('git', args, { cwd: root, env, input, encoding: 'utf8', stdio: [input ? 'pipe' : 'ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })
+  if (existsSync(realPath)) {
+    // The copy keeps the real index's timestamp. Git compares each entry's time with the index file's own to decide
+    // which same-second edits it must re-read ("racily clean" entries); a copy stamped now made a same-size edit
+    // made within a second of the last commit look unchanged. The tests caught it as a flake.
+    copyFileSync(realPath, scratch)
+    const { atime, mtime } = statSync(realPath)
+    utimesSync(scratch, atime, mtime)
   }
-  run('add', '-A', '--', '.')
-  return run('write-tree').trim()
+  else run(['read-tree', '--empty'])
+  // Only the rendered files that differ from the index: new, edited or deleted. ls-files, unlike add, accepts a
+  // pattern that matches nothing (a project with no .css yet), which made the first version of this fail.
+  const paths = run(['ls-files', '-z', '--others', '--modified', '--deleted', '--exclude-standard', '--', ...pathspec(globs)])
+  if (paths) run(['update-index', '--add', '--remove', '-z', '--stdin'], paths)
+  return run(['write-tree']).trim()
+}
+
+// Snapshot trees are referenced by nothing, so `git gc` prunes them after about two weeks, and a log pointing at a
+// pruned tree made the hook fail on every turn after. Keeping each one under a per-worktree ref stops the pruning;
+// treeExists lets a caller fall back if one is gone anyway.
+export function keepTree(root, name, tree) {
+  try {
+    git(root, 'update-ref', `refs/worktree/design-harness/${name}`, tree)
+  } catch {}
+}
+export function treeExists(root, tree) {
+  if (!tree) return false
+  try {
+    git(root, 'cat-file', '-e', `${tree}^{tree}`)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // The project's settings, or null when the harness has not been set up here (the hook then stays silent).
@@ -81,16 +126,14 @@ export function baseOf(root, config) {
   }
 }
 
-export const pathspec = (globs) => globs.map((g) => `:(glob)${g}`)
-
 // Lines added between `base` (a commit or a tree) and the working state, per file, paths relative to `root`.
 // `--relative` keeps a monorepo package's paths joinable to its own folder: without it, git reported them from the
 // repository root and every file silently failed to open, so the checks read nothing and passed.
 export function addedLines(root, base, globs) {
   const map = new Map()
   let file = null
-  const now = snapshot(root)
-  for (const line of git(root, 'diff', '--relative', '-U0', base, now, '--', ...pathspec(globs)).split('\n')) {
+  const now = snapshot(root, globs)
+  for (const line of gitDiff(root, '--relative', '-U0', base, now, '--', ...pathspec(globs)).split('\n')) {
     if (line.startsWith('+++ ')) {
       file = line.startsWith('+++ b/') ? line.slice(6) : null
       continue
@@ -106,9 +149,10 @@ export function addedLines(root, base, globs) {
   return map
 }
 
-// Every file under `globs` that differs between `base` and the working state, deletions left out.
+// Every file under `globs` that differs between `base` and the working state, deletions left out. The population a
+// check states, read independently of the line parser so a parse that found nothing cannot pass as clean.
 export function changedFiles(root, base, globs) {
-  return git(root, 'diff', '--relative', '--name-only', '--diff-filter=d', base, snapshot(root), '--', ...pathspec(globs))
+  return gitDiff(root, '--relative', '--name-only', '--diff-filter=d', base, snapshot(root, globs), '--', ...pathspec(globs))
     .split('\n')
     .filter(Boolean)
 }
@@ -190,7 +234,7 @@ export async function openBrowser(root, config) {
 
 // `**/` is any depth, `**` anything, `*` anything within one folder. Placeholders first: the single-star step used to
 // rewrite the `.*` the double-star step had just written, so `**/theme.css` matched one folder deep and no deeper,
-// and a theme file at src/styles/theme.css was flagged as drift. tests/lib.test.mjs holds the cases.
+// and a theme file at src/styles/theme.css was flagged as drift. tests/harness.test.mjs holds the cases.
 export function globToRegExp(glob) {
   const re = glob
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')

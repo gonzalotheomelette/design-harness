@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { baseOf, git, gitDirOf, loadConfig, pathspec, snapshot } from '../bin/lib.mjs'
+import { baseOf, gitDiff, gitDirOf, keepTree, loadConfig, pathspec, snapshot, treeExists } from '../bin/lib.mjs'
 
 const HARNESS = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -59,7 +59,9 @@ const readJson = (p, fallback) => {
 
 try {
   if (input.hook_event_name === 'UserPromptSubmit') {
-    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart: snapshot(root) }))
+    const turnStart = snapshot(root, config.ui)
+    keepTree(root, 'turn', turnStart)
+    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart }))
     process.exit(0)
   }
   if (input.hook_event_name && input.hook_event_name !== 'Stop') process.exit(0)
@@ -70,64 +72,88 @@ try {
   process.exit(0)
 }
 
+// Has a ui-review naming this fingerprint been called, and has its report come back? A foreground report is a
+// tool_result for the call that is not the launch notice; a background one is a task-notification carrying the call's
+// id and a completed status.
+function reviewOf(fingerprint) {
+  if (!fingerprint || !input.transcript_path || !existsSync(input.transcript_path)) return { called: false, reported: false }
+  const lines = readFileSync(input.transcript_path, 'utf8').split('\n')
+  const calls = new Set()
+  for (const line of lines) {
+    if (!/"subagent_type":"(?:[\w-]+:)?ui-review"/.test(line) || !line.includes(`fingerprint: ${fingerprint}`)) continue
+    for (const m of line.matchAll(/"type":"tool_use","id":"([^"]+)","name":"(?:Agent|Task)"/g)) calls.add(m[1])
+  }
+  for (const id of calls) {
+    for (const line of lines) {
+      if (!line.includes(id)) continue
+      if (
+        (line.includes(`"tool_use_id":"${id}"`) && line.includes('"type":"tool_result"') && !line.includes('Async agent launched')) ||
+        (line.includes(`<tool-use-id>${id}</tool-use-id>`) && line.includes('<status>completed</status>'))
+      )
+        return { called: true, reported: true }
+    }
+  }
+  return { called: calls.size > 0, reported: false }
+}
+
 function main() {
   const UI = pathspec(config.ui)
   const state = readJson(statePath, { blocks: 0 })
-  const now = snapshot(root)
-  const changedSince = (from) => git(root, 'diff', '--relative', '--name-only', from, now, '--', ...UI).split('\n').filter(Boolean)
+  const save = () => writeFileSync(statePath, JSON.stringify(state))
+  const now = snapshot(root, config.ui)
+  const changedSince = (from) => gitDiff(root, '--relative', '--name-only', from, now, '--', ...UI).split('\n').filter(Boolean)
+  const readLog = () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean) : [])
+  const isLogged = (fp) => readLog().some((l) => l.split(' ')[0] === fp)
+  const logReview = (fp, tree) => {
+    appendFileSync(logPath, `${fp} ${tree}\n`)
+    keepTree(root, 'reviewed', tree)
+  }
 
-  // Did THIS turn change anything rendered? Without a turn snapshot (the hook was installed mid-session), fall back
-  // to the branch.
-  const turnFiles = state.turnStart ? changedSince(state.turnStart) : null
-  if (turnFiles && !turnFiles.length) process.exit(0)
+  // Did THIS turn change anything rendered? Without a usable turn snapshot (the hook was installed mid-session, or
+  // the tree is gone), fall back to the branch.
+  const turnStart = treeExists(root, state.turnStart) ? state.turnStart : null
+  if (turnStart && !changedSince(turnStart).length) process.exit(0)
 
-  // The change to review: since the last review on this worktree if there was one, else since the turn began, else
-  // the branch. Reviewed changes are logged as "<fingerprint> <tree>".
-  const logLines = existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean) : []
-  const lastTree = logLines.map((l) => l.split(' ')[1]).filter(Boolean).at(-1)
-  const from = lastTree ?? state.turnStart ?? baseOf(root, config)
+  // A review asked for earlier in this message that has now reported is logged against the tree it was asked about,
+  // whatever the session changed after it. Logging only when the state at the stop still matched left the range
+  // anchored at the previous review, so later reviews re-read old work and repeated findings already declined.
+  if (state.lastBlocked && state.askedTree && !isLogged(state.lastBlocked) && reviewOf(state.lastBlocked).reported) {
+    logReview(state.lastBlocked, state.askedTree)
+    state.reviewed = true
+    save()
+  }
+
+  // The change to review: since the last review on this worktree, else since the turn began, else the branch. A
+  // logged tree that git has since pruned is skipped rather than diffed, which used to fail every turn after.
+  const lastTree = readLog()
+    .map((l) => l.split(' ')[1])
+    .filter(Boolean)
+    .reverse()
+    .find((t) => treeExists(root, t))
+  const from = lastTree ?? turnStart ?? baseOf(root, config)
   const files = changedSince(from)
   if (!files.length) process.exit(0)
 
-  // The fingerprint names the content of the rendered files as they stand, so the same state is never reviewed twice.
-  const fingerprint = createHash('sha1').update(git(root, 'diff', '--relative', from, now, '--', ...UI)).update(from).digest('hex').slice(0, 12)
+  // Fixes the session made after this message's review: they ride with the next change rather than raising a note.
+  if (state.reviewed) process.exit(0)
 
-  // Reviewed already? A ui-review call naming this fingerprint whose report has come back: a foreground tool_result
-  // that is not the launch notice, or a background task-notification carrying the call's id and a completed status.
-  const logged = logLines.some((l) => l.split(' ')[0] === fingerprint)
-  let reviewedHere = false
-  let pending = (input.background_tasks ?? []).some((t) => /ui-review/.test(JSON.stringify(t)))
-  if (!logged && input.transcript_path && existsSync(input.transcript_path)) {
-    const lines = readFileSync(input.transcript_path, 'utf8').split('\n')
-    const calls = new Set()
-    for (const line of lines) {
-      if (!/"subagent_type":"(?:[\w-]+:)?ui-review"/.test(line) || !line.includes(`fingerprint: ${fingerprint}`)) continue
-      for (const m of line.matchAll(/"type":"tool_use","id":"([^"]+)","name":"(?:Agent|Task)"/g)) calls.add(m[1])
-    }
-    for (const id of calls) {
-      for (const line of lines) {
-        if (!line.includes(id)) continue
-        if (
-          (line.includes(`"tool_use_id":"${id}"`) && line.includes('"type":"tool_result"') && !line.includes('Async agent launched')) ||
-          (line.includes(`<tool-use-id>${id}</tool-use-id>`) && line.includes('<status>completed</status>'))
-        )
-          reviewedHere = true
-      }
-    }
-    if (calls.size && !reviewedHere) pending = true
-  }
-  if (logged || reviewedHere) {
-    if (!logged) appendFileSync(logPath, `${fingerprint} ${now}\n`)
+  // The fingerprint names the change as it stands, so the same state is never reviewed twice.
+  const fingerprint = createHash('sha1').update(gitDiff(root, '--relative', from, now, '--', ...UI)).update(from).digest('hex').slice(0, 12)
+  if (isLogged(fingerprint)) process.exit(0)
+  const review = reviewOf(fingerprint)
+  if (review.reported) {
+    logReview(fingerprint, now)
     process.exit(0)
   }
+  const pending = review.called || (input.background_tasks ?? []).some((t) => /ui-review/.test(JSON.stringify(t)))
 
   const say = (systemMessage) => process.stdout.write(JSON.stringify({ systemMessage }))
   // Asking again for a review that is still running is the same request, not a new review, so it does not spend the
-  // per-message cap; it is allowed once, so a session that never waits cannot loop. Without this, one review per
-  // message let a background review use the only ask and the turn ended before the report, the first trial's fault.
+  // per-message cap; it is allowed once, so a session that never waits cannot loop.
   const rechase = pending && state.lastBlocked === fingerprint && !state.rechased
   if (rechase) {
-    writeFileSync(statePath, JSON.stringify({ ...state, rechased: true }))
+    state.rechased = true
+    save()
   } else if (state.blocks >= config.maxReviewsPerMessage) {
     say(`Review before show: the latest change to ${files.length} rendered file(s) was not reviewed (limit of ${config.maxReviewsPerMessage} per message).`)
     process.exit(0)
@@ -136,7 +162,13 @@ function main() {
     say(`Review before show: the session stopped without running the review it was asked for (${files.length} rendered file(s) unreviewed).`)
     process.exit(0)
   }
-  if (!rechase) writeFileSync(statePath, JSON.stringify({ ...state, blocks: state.blocks + 1, lastBlocked: fingerprint }))
+  if (!rechase) {
+    state.blocks += 1
+    state.lastBlocked = fingerprint
+    state.askedTree = now
+    keepTree(root, 'asked', now)
+    save()
+  }
 
   const list = files.slice(0, 10).join(', ') + (files.length > 10 ? `, and ${files.length - 10} more` : '')
   process.stdout.write(
@@ -148,10 +180,10 @@ function main() {
           (pending ? `note that the ui-review you started has not reported, and a review still running in the background does not count. ` : '') +
           `run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) and wait for its report. ` +
           `Put these lines in its prompt: "fingerprint: ${fingerprint}", "harness: ${HARNESS}", "base: ${from}", ` +
-          `"change: git diff --relative ${from} -- ." and one sentence on what the change is for. ` +
-          `Then fix the findings you agree with in what this turn built. Anything that would change a surface this turn ` +
-          `did not set out to change, or that contradicts what the person asked for, is theirs to decide: list it for ` +
-          `them instead of changing it.`,
+          `"change: git diff --relative ${from} ${now}" (two snapshots, so new files are in it) and one sentence on what ` +
+          `the change is for. Then fix the findings you agree with in what this turn built. Anything that would change a ` +
+          `surface this turn did not set out to change, or that contradicts what the person asked for, is theirs to ` +
+          `decide: list it for them instead of changing it.`,
       },
     }),
   )
