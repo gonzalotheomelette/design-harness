@@ -83,6 +83,10 @@ try {
 }
 console.log(`a11y: ${targets.length} page(s), ${runs} page/mode/width runs with ${browser.kind}, ${passed} rule passes, ${serious} serious or critical`)
 if (serious) process.exit(1)
+if (runs && !passed) {
+  console.log('a11y: NOT A CLEAN PASS. No rule passed on any page, so the pages were probably blank.')
+  process.exit(2)
+}
 if (unloaded) {
   console.log(`a11y: NOT A CLEAN PASS. ${unloaded} run(s) could not load their page, so they checked nothing.`)
   process.exit(2)

@@ -41,7 +41,7 @@ function hook(dir, event, extra = {}) {
 const gitDir = (dir) => join(dir, '.git')
 const check = (dir, name, ...args) => spawnSync('node', [join(HARNESS, 'bin', name), ...args], { cwd: dir, encoding: 'utf8' })
 const packetDir = (dir, fp) => join(gitDir(dir), 'design-harness', 'review', fp)
-const tokenOf = (dir, fp) => readFileSync(join(packetDir(dir, fp), 'token'), 'utf8').trim()
+const tokenOf = (dir, fp) => readFileSync(join(gitDir(dir), 'design-harness', 'tokens', fp), 'utf8').trim()
 const baseIn = (dir, fp) => readFileSync(join(packetDir(dir, fp), 'README.md'), 'utf8').match(/base: ([0-9a-f]{40})/)?.[1]
 
 test('globs match at any depth, and only where they should', () => {
@@ -342,7 +342,7 @@ test('copy one element down is measured as the element that renders it, and link
   assert.match(r.stdout, /a\.tsx:3 {2}button is 7 words/, r.stdout)
   assert.match(r.stdout, /a\.tsx:4 {2}button is 7 words/, r.stdout)
   assert.doesNotMatch(r.stdout, /a\.tsx:5/, `a five-word link in a sentence is not a long button: ${r.stdout}`)
-  assert.match(r.stdout, /3 strings .* measured/, r.stdout)
+  assert.match(r.stdout, /4 strings .* measured/, r.stdout) // the <p> around the link counts too
 })
 
 // Round four: the reviewer has no shell, and the hook prepares what it reads.
@@ -359,7 +359,8 @@ test('the reviewer has no shell, and the hook hands it a packet with the change 
   write(dir, { 'src/a.tsx': 'export const A = () => <p className="p-[13px]">x</p>\n' })
   const fp = fpOf(askFor(dir))
   const packet = packetDir(dir, fp)
-  assert.match(readFileSync(join(packet, 'README.md'), 'utf8'), new RegExp(`review-token: ${tokenOf(dir, fp)}`))
+  assert.match(readFileSync(join(packet, 'change.diff'), 'utf8').split('\n')[0], new RegExp(`^review-token: ${tokenOf(dir, fp)}$`))
+  assert.ok(!existsSync(join(packet, 'token')), 'the token is not left in the packet')
   assert.match(readFileSync(join(packet, 'checks.txt'), 'utf8'), /src\/a\.tsx:1 {2}size: p-\[13px\]/)
   assert.match(readFileSync(join(packet, 'server.txt'), 'utf8'), /serves this checkout/)
 })
@@ -568,4 +569,91 @@ test('commands to run come only from untracked local settings, never from the pr
   hook(dir3, 'UserPromptSubmit')
   write(dir3, { 'src/a.tsx': 'y\n' })
   assert.equal(JSON.parse(readFileSync(join(packetDir(dir3, fpOf(askFor(dir3))), 'settings.json'), 'utf8')).screenshot, 'npm run shoot -- {route}')
+})
+
+// Round six.
+
+test('work pulled in between messages is not reviewed as this turn\'s', () => {
+  const dir = repo({ 'src/a.tsx': 'a\n', 'src/b.tsx': 'b\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'a1\n' })
+  hook(dir, 'Stop', { transcript_path: reported(dir, fpOf(askFor(dir))) })
+  // Between messages: a teammate's commit arrives.
+  write(dir, { 'src/b.tsx': 'teammate\n' })
+  execFileSync('git', ['add', '-A'], { cwd: dir })
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'pulled teammate work'], { cwd: dir })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'a2\n' })
+  const ctx = askFor(dir)
+  assert.match(ctx, /\(1: src\/a\.tsx\)/, ctx)
+})
+
+test('work a message left unreviewed is carried into the next one', () => {
+  const dir = repo({ 'src/a.tsx': 'a\n', 'src/b.tsx': 'b\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'a1\n' })
+  askFor(dir) // asked once
+  assert.ok(hook(dir, 'Stop').out?.systemMessage, 'the cap lets it through unreviewed')
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/b.tsx': 'b1\n' })
+  assert.match(askFor(dir), /2: src\/a\.tsx, src\/b\.tsx/)
+})
+
+test('a message queued before the last turn stopped keeps that turn\'s edits in range', () => {
+  const dir = repo({ 'src/a.tsx': 'a\n', 'src/b.tsx': 'b\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'a1\n' })
+  hook(dir, 'UserPromptSubmit') // queued: fires before any stop
+  write(dir, { 'src/b.tsx': 'b1\n' })
+  assert.match(askFor(dir), /2: src\/a\.tsx, src\/b\.tsx/)
+})
+
+test('plain HTML copy is measured, and drift reads the universal selector and class lists built with push', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n', 'src/b.css': 'x{}\n' })
+  write(dir, {
+    'src/a.tsx': [
+      'export const A = ({ cls }) => {',
+      "  cls.push('text-[#ff0000]')",
+      "  router.push('/settings#added')",
+      '  return <main><h1>Welcome to the place where every one of your projects comes together</h1></main>',
+      '}',
+    ].join('\n') + '\n',
+    'src/b.css': '/* #fff in a comment\n * #000 too\n */\n* { color: #ff0000; }\n',
+  })
+  const drift = check(dir, 'check-drift.mjs').stdout
+  assert.match(drift, /a\.tsx:2 /, drift)
+  assert.doesNotMatch(drift, /a\.tsx:3 /, drift)
+  assert.match(drift, /b\.css:4 /, drift)
+  for (const l of [1, 2, 3]) assert.doesNotMatch(drift, new RegExp(`b\\.css:${l} `), drift)
+  assert.match(check(dir, 'check-copy-length.mjs').stdout, /a\.tsx:4 {2}title is 12 words/)
+})
+
+test('the checks parse with the harness\'s TypeScript, never a copy in the project', () => {
+  const marker = join(mkdtempSync(join(tmpdir(), 'dh-mark-')), 'ran')
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  write(dir, {
+    'node_modules/typescript/package.json': '{"name":"typescript","main":"index.js"}',
+    'node_modules/typescript/index.js': `require('fs').writeFileSync(${JSON.stringify(marker)}, 'ran'); module.exports = {}`,
+    'src/a.tsx': 'export const A = () => <Button>Save every single one of these changes now</Button>\n',
+  })
+  const r = check(dir, 'check-copy-length.mjs')
+  assert.match(r.stdout, /button is 8 words/, r.stdout)
+  assert.ok(!existsSync(marker), 'the project\'s typescript ran')
+  check(dir, 'check-drift.mjs')
+  assert.ok(!existsSync(marker), 'the project\'s typescript ran')
+})
+
+test('an accessibility run that passed no rule is not clean', () => {
+  const dir = repo({ 'src/a.tsx': 'x' })
+  write(dir, {
+    'node_modules/puppeteer/package.json': '{"name":"puppeteer","main":"index.js"}',
+    'node_modules/puppeteer/index.js': `module.exports = { launch: async () => ({
+      newPage: async () => ({ setViewport: async () => {}, emulateMediaFeatures: async () => {}, goto: async () => ({ status: () => 200 }), close: async () => {} }),
+      close: async () => {} }) }`,
+    'node_modules/@axe-core/puppeteer/package.json': '{"name":"@axe-core/puppeteer","main":"index.js"}',
+    'node_modules/@axe-core/puppeteer/index.js': 'module.exports = { AxePuppeteer: class { withTags() { return this } async analyze() { return { violations: [], passes: [] } } } }',
+  })
+  const r = check(dir, 'check-a11y.mjs', '/blank')
+  assert.equal(r.status, 2, r.stdout + r.stderr)
+  assert.match(r.stdout, /NOT A CLEAN PASS/)
 })

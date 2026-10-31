@@ -113,7 +113,9 @@ plugins/design-harness/
   skills/web-design-guidelines/     Vercel's wider review, for PR time
   reference/ai-look.md              the devices that read as generated
   bin/                              check-copy-length, check-drift, check-a11y, shoot, server-of (run from a
-                                    project root; they use the project's own Playwright or Puppeteer)
+                                    project root). Copy and drift parse with the TypeScript in bin/vendor, never
+                                    the project's; check-a11y and shoot, which the session runs, use the project's
+                                    own Playwright or Puppeteer
 dotfiles/CLAUDE.md                  Gonzalo's working rules for every project; install.sh links it
 docs/benchmark.md                   method and results
 bench/                              the benchmark's cases, scripts, prompts and scores, to rerun it
@@ -133,6 +135,9 @@ rules or its model change.
 - Anything but macOS, on purpose: the dev-server proof uses `lsof` and the browser search knows Mac paths first.
 - Fixes made after a review reach the next review, not this turn's: a second review of every fix would double the
   wait for little.
+- Code from the project: the hook runs none (it parses with its own TypeScript and names no command from the
+  project's settings), but the browser checks the session runs load the project's Playwright or Puppeteer, as the
+  project's own scripts would.
 - Supply chain below the top level: external plugins are pinned by commit and the DESIGN.md linter by version, but
   the harness itself only by tag (Claude Code's marketplace source takes a branch or tag, not a commit), the linter's
   own dependencies float, and Impeccable downloads a binary on first use.

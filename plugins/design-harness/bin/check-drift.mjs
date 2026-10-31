@@ -24,14 +24,14 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseArg, changedFiles, loadConfig, matchesAny, projectRequire } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, changedFiles, loadConfig, matchesAny, harnessTypescript } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
 const base = baseArg(config, root)
 const scope = addedLines(root, base, config.ui)
-// The project's TypeScript, when it has one, finds strings exactly; without it a scanner stands in.
-const ts = projectRequire(root, 'typescript')
+// The harness's own TypeScript finds strings exactly; if it cannot be loaded, a scanner stands in.
+const ts = harnessTypescript()
 
 // Named colours a hand reaches for; the full CSS list is mostly ones nobody types (papayawhip).
 const NAMED =
@@ -118,7 +118,12 @@ function stringsByAst(file, src) {
   const ignored = (node) => {
     const p = node.parent
     if (p && ts.isJsxAttribute(p)) return NOT_STYLE.test(p.name.getText(sf))
-    if (p && ts.isCallExpression(p)) return /querySelector|getElementById|scrollIntoView|push|replace|navigate/.test(p.expression.getText(sf))
+    // Navigation and DOM lookups take ids and paths, not styles. Matched on the callee's name, so `cls.push('…')`
+    // and `str.replace(…)` are still read.
+    if (p && ts.isCallExpression(p))
+      return /(^|\.)(querySelector(All)?|getElementById|scrollIntoView|navigate|redirect)$|(^|\.)router\.(push|replace|prefetch)$|(^|\.)location\.(assign|replace)$/.test(
+        p.expression.getText(sf),
+      )
     return p && (ts.isImportDeclaration(p) || ts.isExportDeclaration(p))
   }
   const visit = (node) => {
@@ -166,12 +171,28 @@ for (const [file, lines] of scope) {
       if (/<\/style>/i.test(line)) open = false
     })
   }
+  // Stylesheet lines with their comments taken out, block comments followed across lines. Skipping any line that
+  // began with `*` skipped the universal selector (`* { color: #f00 }`) along with comment bodies.
+  const css = new Map()
+  let inComment = false
+  text.forEach((line, i) => {
+    if (!(stylesheet || inStyle.has(i + 1))) return
+    let out = ''
+    for (let k = 0; k < line.length; k++) {
+      if (inComment) {
+        if (line[k] === '*' && line[k + 1] === '/') (inComment = false), k++
+      } else if (line[k] === '/' && line[k + 1] === '*') (inComment = true), k++
+      else if (line[k] === '/' && line[k + 1] === '/' && !/:$/.test(out) && /^\s*$/.test(out)) break
+      else out += line[k]
+    }
+    css.set(i + 1, out.replace(/<\/?style[^>]*>/gi, ''))
+  })
   text.forEach((line, i) => {
     if (lines !== 'all' && !lines.has(i + 1)) return
     read++
-    const sheet = stylesheet || inStyle.has(i + 1)
-    if (/drift-ok:/.test(line) || (sheet && /^\s*(\/\/|\*|\/\*)/.test(line))) return
-    const haystacks = sheet ? [line.replace(/<\/?style[^>]*>/gi, '')] : (strings.get(i + 1) ?? [])
+    const sheet = css.has(i + 1)
+    if (/drift-ok:/.test(line)) return
+    const haystacks = sheet ? [css.get(i + 1)] : (strings.get(i + 1) ?? [])
     for (const text of haystacks)
     for (const [kind, re] of RULES) {
       const m = text.match(re)

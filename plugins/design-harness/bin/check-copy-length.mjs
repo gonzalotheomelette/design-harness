@@ -24,7 +24,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseArg, changedFiles, git, loadConfig, matchesAny, pathspec, projectRequire } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, changedFiles, git, loadConfig, matchesAny, pathspec, harnessTypescript } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
@@ -33,7 +33,7 @@ const SURVEY = args.includes('--survey')
 const ALL = args.includes('--all') || SURVEY
 
 // Required only once there is something to parse, so the files it cannot read are named first, whatever happens.
-const ts = projectRequire(root, 'typescript')
+const ts = harnessTypescript()
 
 const LIMITS = {
   button: 4,
@@ -57,6 +57,21 @@ const TAG_KIND = {
   // caught, because the list held component names alone.
   button: 'button',
   a: 'link',
+  // Plain HTML: a new app's copy is mostly headings and paragraphs, and with only component names listed a 35-word
+  // <p> passed as "every one is within its limit".
+  h1: 'title',
+  h2: 'title',
+  h3: 'subtitle',
+  h4: 'subtitle',
+  h5: 'subtitle',
+  h6: 'subtitle',
+  p: 'description',
+  label: 'label',
+  legend: 'label',
+  th: 'label',
+  li: 'helper',
+  small: 'helper',
+  figcaption: 'description',
   Button: 'button',
   Badge: 'badge',
   Heading: 'title',

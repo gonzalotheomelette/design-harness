@@ -2,8 +2,12 @@
 // file, and what the branch is compared against. One place, so the hook and the checks never disagree about
 // which change they are looking at.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
+import { gunzipSync } from 'node:zlib'
+import { dirname, isAbsolute, join } from 'node:path'
 import { createRequire } from 'node:module'
 
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -242,7 +246,31 @@ export function localTargets(args, config) {
   return { targets, refused }
 }
 
-// A package resolved from the PROJECT, not from the plugin, which ships no node_modules of its own.
+// The TypeScript the checks parse with ships with the harness, so the hook never runs code from the repository it is
+// checking: loading the project's own node_modules/typescript let a cloned repository run code on every stop. It is
+// TypeScript 6.0.3, gzipped, unpacked once into the temp folder and checked against its hash on every load.
+const TS_VERSION = '6.0.3'
+const TS_SHA256 = '569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39'
+export function harnessTypescript() {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const gz = join(here, 'vendor', `typescript-${TS_VERSION}.js.gz`)
+  const out = join(tmpdir(), `design-harness-typescript-${TS_VERSION}-${TS_SHA256.slice(0, 12)}.cjs`)
+  const ok = (buf) => createHash('sha256').update(buf).digest('hex') === TS_SHA256
+  try {
+    if (!existsSync(out) || !ok(readFileSync(out))) {
+      const buf = gunzipSync(readFileSync(gz))
+      if (!ok(buf)) return null
+      const tmp = `${out}.${process.pid}`
+      writeFileSync(tmp, buf)
+      renameSync(tmp, out)
+    }
+    return createRequire(import.meta.url)(out)
+  } catch {
+    return null
+  }
+}
+
+// A package resolved from the PROJECT, not from the plugin: only the browser libraries, which the session runs.
 export function projectRequire(root, name) {
   try {
     return createRequire(join(root, 'package.json'))(name)

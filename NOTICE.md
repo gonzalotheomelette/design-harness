@@ -10,3 +10,6 @@
 - The marketplace lists, but does not copy, frontend-design (anthropics/claude-plugins-official), Impeccable,
   modern-web-guidance (GoogleChrome, Apache-2.0) and emilkowalski/skills (MIT). Each installs from its own
   repository at the commit pinned in `.claude-plugin/marketplace.json`.
+- `plugins/design-harness/bin/vendor/typescript-6.0.3.js.gz` is Microsoft's TypeScript 6.0.3 (`lib/typescript.js`),
+  Apache-2.0, gzipped and unmodified; its licence is beside it. The checks parse with it so they never load the
+  project's own copy.
