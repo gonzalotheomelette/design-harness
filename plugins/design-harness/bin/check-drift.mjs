@@ -47,8 +47,12 @@ for (const [file, lines] of scope) {
     if (lines !== 'all' && !lines.has(i + 1)) return
     read++
     if (/drift-ok:/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) return
+    // In a stylesheet the whole line is styling. In a component only strings are (class names, inline styles):
+    // reading the code too flagged `if (!paid)` as a forced override on the first the client prototype trial.
+    const haystacks = /\.(css|scss|sass|less)$/.test(file) ? [line] : [...line.matchAll(/(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2])
+    for (const text of haystacks)
     for (const [kind, re] of RULES) {
-      const m = line.match(re)
+      const m = text.match(re)
       // One finding per line: `text-[#d00]` is both an arbitrary value and a raw colour, and saying it twice is noise.
       if (m) {
         findings.push(`  ${file}:${i + 1}  ${kind}: ${m[0].trim()}`)

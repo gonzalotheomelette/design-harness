@@ -106,7 +106,8 @@ plugins/design-harness/
   skills/feedback/                  client notes in (Google Docs, Claude Docs, Granola), sorted, built, answered
   skills/web-design-guidelines/     Vercel's wider review, for PR time
   reference/ai-look.md              the devices that read as generated
-  bin/                              check-copy-length, check-drift, check-a11y (run from a project root)
+  bin/                              check-copy-length, check-drift, check-a11y, shoot, server-of (run from a
+                                    project root; they use the project's own Playwright or Puppeteer)
 dotfiles/CLAUDE.md                  Gonzalo's working rules for every project; install.sh links it
 docs/benchmark.md                   method and results
 ```

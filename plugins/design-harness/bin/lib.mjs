@@ -90,6 +90,69 @@ export function projectRequire(root, name) {
   }
 }
 
+// A browser from whatever the project already has: Playwright, else Puppeteer. A project should not have to add a
+// second browser library for the harness, and the 2026-10-31 the client prototype trial had only Puppeteer. Pages come back with
+// one shape whichever library is behind them: { goto, screenshot, axe, close }.
+const BROWSERS = [
+  process.env.PUPPETEER_EXECUTABLE_PATH,
+  process.env.BROWSER_PATH,
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+]
+export async function openBrowser(root, config) {
+  const pw = projectRequire(root, 'playwright') ?? projectRequire(root, '@playwright/test')
+  if (pw) {
+    const axeLib = projectRequire(root, '@axe-core/playwright')
+    const browser = await pw.chromium.launch()
+    return {
+      kind: 'playwright',
+      hasAxe: !!axeLib,
+      async page({ colorScheme = 'light', viewport }) {
+        const page = await browser.newPage({ colorScheme, viewport })
+        return {
+          goto: (url) => page.goto(url, { waitUntil: 'networkidle' }),
+          screenshot: (path) => page.screenshot({ path, fullPage: true }),
+          axe: (tags) => new (axeLib.default ?? axeLib.AxeBuilder)({ page }).withTags(tags).analyze(),
+          close: () => page.close(),
+        }
+      },
+      close: () => browser.close(),
+    }
+  }
+  const pp = projectRequire(root, 'puppeteer') ?? projectRequire(root, 'puppeteer-core')
+  if (pp) {
+    const axeLib = projectRequire(root, '@axe-core/puppeteer')
+    const executablePath = config?.browserPath ?? BROWSERS.filter(Boolean).find((p) => existsSync(p))
+    let browser
+    try {
+      browser = await pp.launch({ headless: true })
+    } catch {
+      browser = await pp.launch({ headless: true, executablePath })
+    }
+    return {
+      kind: 'puppeteer',
+      hasAxe: !!axeLib,
+      async page({ colorScheme = 'light', viewport }) {
+        const page = await browser.newPage()
+        await page.setViewport(viewport)
+        await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: colorScheme }])
+        return {
+          goto: (url) => page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 }),
+          screenshot: (path) => page.screenshot({ path, fullPage: true }),
+          axe: (tags) => new (axeLib.AxePuppeteer ?? axeLib.default)(page).withTags(tags).analyze(),
+          close: () => page.close(),
+        }
+      },
+      close: () => browser.close(),
+    }
+  }
+  return null
+}
+
 export function globToRegExp(glob) {
   const re = glob
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')

@@ -90,27 +90,31 @@ Apply `<harness>/reference/ai-look.md` to the changed surfaces. Anything listed 
 `DESIGN.md` is a deliberate choice of this project and not a finding. When unsure whether a device was chosen,
 grep `DESIGN.md` and the rules file before flagging.
 
-## 7. Look at it, and check accessibility, if you can do so honestly
+## 7. Look at it, and check accessibility
 
-Two sessions can share a port, so first prove the dev server is serving this checkout (macOS and Linux):
+Run this on every review; it takes a second, and two sessions can share a port:
 
 ```bash
-port=$(node -e "console.log(new URL(require('./.claude/design-harness.json').devServer||'http://localhost:3000').port||80)" 2>/dev/null || echo 3000)
-pid=$(lsof -nP -iTCP:$port -sTCP:LISTEN -t | head -1)
-[ -n "$pid" ] && lsof -a -p "$pid" -d cwd -Fn | sed -n 's/^n//p'; pwd
+node <harness>/bin/server-of.mjs
 ```
 
-If the paths differ or nothing is listening, skip this step and say so. Never start a server. If it is this
-checkout's, and the change can move pixels a reader would notice (copy-only changes are judged by reading):
+If it does not say `yes`, skip the rest of this step and quote its line in your report. Never start a server.
+
+If it says `yes`, looking is the default, not an option: shoot and check the main page the change renders on
+whenever the change adds, removes or moves an element, changes a class, or changes copy that could wrap. Skip only a
+change with no rendered effect (types, data plumbing, tests), and say so. Reading code missed every slip in the
+benchmark that only showed in a picture, and "it is mostly copy" was the reason a live trial skipped the pictures
+of a change that added rows to a page. Work out the route from the file's place in the app's routes
+(`app/(group)/dashboard/billing/page.tsx` is `/dashboard/billing`).
 
 ```bash
 node <harness>/bin/check-a11y.mjs /<changed-route>
-npx playwright screenshot --viewport-size=1280,900 <url> /tmp/ui-review-desktop.png
-npx playwright screenshot --viewport-size=390,844 <url> /tmp/ui-review-phone.png
+node <harness>/bin/shoot.mjs /<changed-route> /<sibling-route>
 ```
 
-Shoot the sibling's route too, open every image with Read, and judge the picture: if a problem shows in a
-screenshot, it is real, whatever the code says.
+If `.claude/design-harness.json` names a `screenshot` command (a project tool that signs in as a persona or seeds
+state), use it instead of `shoot.mjs`, with `{route}` replaced. Open every image with Read and judge the picture,
+the changed surface beside its sibling: if a problem shows in a screenshot, it is real, whatever the code says.
 
 ## 8. Report
 

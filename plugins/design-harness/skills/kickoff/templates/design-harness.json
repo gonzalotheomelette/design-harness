@@ -19,5 +19,6 @@
   "copyLimits": {},
   "requirements": "docs/product",
   "decisions": "docs/decision-log.md",
-  "questions": "docs/open-questions.md"
+  "questions": "docs/open-questions.md",
+  "screenshot": null
 }
