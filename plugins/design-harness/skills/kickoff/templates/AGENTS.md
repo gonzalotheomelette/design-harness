@@ -9,7 +9,10 @@ For any coding agent (Claude Code, Codex, Cursor). Claude Code reads it through 
 - **PRODUCT.md** is who it is for and how it speaks. Copy follows its voice.
 - **docs/ui-consistency.md** holds the rules that make sibling surfaces match. Read the rows for the elements you
   touch before building.
-- **design/** holds the brand assets, artwork and references.
+- **design/** holds the mood board, brand assets, artwork and references.
+- **docs/product/** holds one requirement per surface or flow. Read it before building that surface; if there is
+  none, write one from the template first. **docs/decision-log.md** records what was decided and by whom, and
+  **docs/open-questions.md** what is waiting on the client: check both before treating anything as open.
 
 ## Before building a surface
 

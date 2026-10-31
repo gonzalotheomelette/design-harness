@@ -11,7 +11,9 @@ designer before a reviewer has compared it with what already exists.
   checks the project's settled rules and an AI-look register, measures copy length against the project's approved
   copy, checks token drift and accessibility, and reports. The session fixes what it agrees with and says what it
   left. Later reviews read only what changed since the last one.
-- **Kickoff from a mood board.** `/design-harness:kickoff` turns a mood board and a brief into `PRODUCT.md`,
+- **Kickoff, with or without a mood board.** `/design-harness:kickoff` starts from a brief. It builds the mood board
+  with you when there isn't one, or brings in what exists (a Claude Design artifact, a Figma file, a live site, a
+  brand guide). It turns that into `PRODUCT.md`,
   `DESIGN.md` (Google's format: tokens plus rationale, lint-checked for contrast), generated theme tokens, brand
   folders, a style tile and a sample screen, and switches the review loop on for the project.
 - **Rules that grow from corrections.** `/design-harness:learn` turns each correction into a row in the project's
@@ -22,6 +24,13 @@ designer before a reviewer has compared it with what already exists.
 How well the reviewer works, measured blind against a designer's real corrections, is in
 [docs/benchmark.md](docs/benchmark.md): 11 of 18 corrections caught, 11 findings a review, 89 seconds median, ahead
 of every public reviewer tested.
+
+- **Product work in the same place.** A requirement per surface (`docs/product/`), a decision log and an open
+  questions register sit beside the design files. The reviewer checks each surface against its requirement, so a
+  listed state that was never designed is caught. Client-facing copies go to Google Docs or Claude Docs for comments, and
+  `/design-harness:feedback` brings their comments, meeting notes and revisions back: each note sorted into a
+  decision, a requirement, a revision or a question, built with your go-ahead, and answered in your voice once you
+  approve the drafts.
 
 ## Start a new project
 
@@ -71,9 +80,13 @@ your-project/
   PRODUCT.md                audience, use scene, surfaces and their modes, voice
   DESIGN.md                 the identity: tokens + rationale, plus Iconography, Imagery, Motion,
                             Chosen on purpose and the Signature move
+  design/moodboard/         the mood board, built with you when there isn't one, and why each round went the way it did
   design/brand/             logo, wordmark, fonts
-  design/artwork/           illustration, photography, the mood board
-  design/references/        pattern references, named for what they show
+  design/artwork/           illustration and photography
+  design/references/        pattern references, and anything imported (Claude Design, Figma, an existing site)
+  docs/product/             one requirement per surface or flow: what it does, its data, its states, its acts
+  docs/decision-log.md      every decision, dated, in the words of whoever made it
+  docs/open-questions.md    what is waiting on the client
   docs/ui-consistency.md    the rules sibling surfaces must share; grows from corrections
   src/styles/theme.css      generated from DESIGN.md; the only place raw values live
   .claude/design-harness.json   which files render, the theme files, the dev server, copy limits
@@ -90,6 +103,7 @@ plugins/design-harness/
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
   skills/learn/                     a correction becomes a rule
+  skills/feedback/                  client notes in (Google Docs, Claude Docs, Granola), sorted, built, answered
   skills/web-design-guidelines/     Vercel's wider review, for PR time
   reference/ai-look.md              the devices that read as generated
   bin/                              check-copy-length, check-drift, check-a11y (run from a project root)

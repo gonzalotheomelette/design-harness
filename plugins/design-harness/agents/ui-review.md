@@ -36,8 +36,9 @@ it was reviewed already and is context only).
 
 Then read the project's settings, `.claude/design-harness.json` (paths below default to the names shown), and,
 when they exist: `DESIGN.md` (the identity: tokens, rationale, and the "Chosen on purpose" section), `PRODUCT.md`
-(who it is for, the voice, what each surface is for) and the rules file (`docs/ui-consistency.md`). Do not read
-them end to end when they are long: read the sections the change touches.
+(who it is for, the voice, what each surface is for), the rules file (`docs/ui-consistency.md`), and the changed
+surface's requirement in `docs/product/` (what it must do, its data, its states, its acts). Do not read them end to
+end when they are long: read the sections the change touches.
 
 ## 1. State the population
 
@@ -67,6 +68,11 @@ differently" is not a reason. Cite both files with line numbers.
 
 Check every row of the rules file that applies to an element kind the change touches. Each row names a reference
 implementation to compare against. Rows under "Unsettled" are not enforced.
+
+When the surface has a requirement in `docs/product/`, check the change against it: every state it lists (empty,
+filtered to nothing, loading, error, no access, one and many and very long) is designed rather than left to a
+default, every act has the reversibility and receipt it names, and missing data reads the way its table says.
+A state the requirement lists and the change does not handle is a finding.
 
 ## 5. Check the copy
 

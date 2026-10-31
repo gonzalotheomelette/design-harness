@@ -1,10 +1,23 @@
 {
-  "ui": ["src/**/*.tsx", "src/**/*.jsx", "src/**/*.css", "app/**/*.tsx", "components/**/*.tsx"],
-  "themeFiles": ["src/styles/theme.css", "src/app/globals.css", "DESIGN.md"],
+  "ui": [
+    "src/**/*.tsx",
+    "src/**/*.jsx",
+    "src/**/*.css",
+    "app/**/*.tsx",
+    "components/**/*.tsx"
+  ],
+  "themeFiles": [
+    "src/styles/theme.css",
+    "src/app/globals.css",
+    "DESIGN.md"
+  ],
   "rules": "docs/ui-consistency.md",
   "design": "DESIGN.md",
   "product": "PRODUCT.md",
   "devServer": "http://localhost:3000",
   "maxReviewsPerMessage": 2,
-  "copyLimits": {}
+  "copyLimits": {},
+  "requirements": "docs/product",
+  "decisions": "docs/decision-log.md",
+  "questions": "docs/open-questions.md"
 }
