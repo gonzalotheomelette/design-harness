@@ -48,7 +48,7 @@ What it says:
   noise. On the client prototype, 0.7.0 over 0.6.0 (11 to 14 against 7) is larger than that. On the website, 2 against 1 is within
   it, from a single 0.6.0 run: no difference shown there.
 - **It is a copy reviewer.** On the client prototype, where the corrections were mostly wordy copy and explainer lines, it found a
-  third to nearly half outright and most of the rest in part, with few findings wasted. On the website, where the
+  third to nearly half outright and 8 or 9 more in part, with few findings wasted. On the website, where the
   corrections were mostly visual (line breaks, a 44px gap, two animations stacked, a near-black that should match) or
   product calls code cannot show ("sprint" to "collaboration", dropping a privacy line, trimming the nav), it found 2
   of 19 outright, and two in five of its findings were not worth the time. Its partial hits there were the copy and
