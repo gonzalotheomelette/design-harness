@@ -20,12 +20,11 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseOf, loadConfig, matchesAny } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, loadConfig, matchesAny } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
-const baseArg = process.argv.find((a) => a.startsWith('--base='))?.slice(7)
-const scope = addedLines(root, baseArg ?? baseOf(root, config), config.ui)
+const scope = addedLines(root, baseArg(config, root), config.ui)
 
 const RULES = [
   ['colour', /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/],
@@ -63,6 +62,11 @@ for (const [file, lines] of scope) {
 }
 
 console.log(`drift: ${read} added line(s) read across ${scope.size} rendered file(s); theme files exempt`)
+const unread = [...scope.keys()].filter((f) => !matchesAny(f, config.themeFiles)).length
+if (!read && unread) {
+  console.log(`drift: NOT A CLEAN PASS. ${unread} changed file(s) could not be read; check them by hand.`)
+  process.exit(0)
+}
 if (!findings.length) {
   console.log('drift: no raw colours, arbitrary sizes or forced overrides')
   process.exit(0)

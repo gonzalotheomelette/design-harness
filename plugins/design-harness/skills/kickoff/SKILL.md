@@ -141,9 +141,14 @@ do when asking.
 
 Copy from `templates/`:
 
-- `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack.
-- `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace and enables the plugins,
-  so every session in this project, and every teammate, gets the same harness).
+- `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack,
+  and `modes` listing the colour modes the product ships (a light-only product lists only `light`, so nothing is
+  screenshotted or checked in a mode it does not have).
+- `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace and enables the plugins).
+  Its `ref` pins the harness to the release tag current at kickoff, so a later change to the harness cannot change
+  this project's behaviour until someone moves the tag on purpose. Before handing a repo to a client's developers,
+  move the plugin settings to `.claude/settings.local.json` (or remove them): the marketplace is private, and the
+  hook would otherwise ask them to install something they cannot reach.
 - `ui-consistency.md` to `docs/ui-consistency.md`. It starts nearly empty on purpose: it fills with the person's
   corrections through `/design-harness:learn`.
 - `decision-log.md` and `open-questions.md` to `docs/`, and `requirement.md` as the pattern for

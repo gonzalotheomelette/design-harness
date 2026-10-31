@@ -27,7 +27,7 @@ const out = mkdtempSync(join(tmpdir(), 'ui-review-'))
 try {
   for (const url of targets) {
     const slug = new URL(url).pathname.replace(/\W+/g, '-').replace(/^-|-$/g, '') || 'home'
-    for (const colorScheme of ['light', 'dark']) {
+    for (const colorScheme of config.modes ?? ['light', 'dark']) {
       for (const [label, viewport] of [['desktop', { width: 1280, height: 900 }], ['phone', { width: 390, height: 844 }]]) {
         const page = await browser.page({ colorScheme, viewport })
         const res = await page.goto(url).catch((e) => ({ error: e }))

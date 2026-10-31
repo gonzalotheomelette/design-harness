@@ -1,7 +1,11 @@
 {
   "extraKnownMarketplaces": {
     "omelette": {
-      "source": { "source": "github", "repo": "gonzalotheomelette/design-harness" }
+      "source": {
+        "source": "github",
+        "repo": "gonzalotheomelette/design-harness",
+        "ref": "v0.4.0"
+      }
     }
   },
   "enabledPlugins": {

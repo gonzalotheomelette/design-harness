@@ -44,6 +44,9 @@ error (the request is now `additionalContext`).
 
 ## Limits
 
-Seven cases from one project, one run each, so run-to-run variance is unknown. The judge is a model. The per-turn
-reviewer's rules were written from the same designer's known preferences, which is the point of it and also a home
-advantage.
+Seven cases from one project, one run each, so run-to-run variance is unknown and 11 against 10 is noise. The cases
+were chosen for the kinds of correction this reviewer targets, and its copy limits were measured on the same
+project's approved copy, so some of the answer was in the instrument: more than an ordinary home advantage. The judge
+is a model. The configuration measured reviewed whole commits without a dev server; the shipped one reviews a turn's
+change and looks at the page, which these numbers do not cover. Next: repeat each case three times and add a second
+project held out from the rules.

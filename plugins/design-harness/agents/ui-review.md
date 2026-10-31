@@ -30,9 +30,9 @@ Read a whole file only when the change sits inside it. A small change should tak
 
 ## 0. Read your inputs
 
-Your prompt carries three lines: `fingerprint:` (repeat it first in your report), `harness:` (the folder holding
-this plugin; the checks below live in `<harness>/bin`), and `change:` (the git range to review; everything outside
-it was reviewed already and is context only).
+Your prompt carries four lines: `fingerprint:` (repeat it first in your report), `harness:` (the folder holding
+this plugin; the checks below live in `<harness>/bin`), `base:` (where the change starts) and `change:` (the git
+command that shows it). Everything outside the change was reviewed already and is context only.
 
 Then read the project's settings, `.claude/design-harness.json` (paths below default to the names shown), and,
 when they exist: `DESIGN.md` (the identity: tokens, rationale, and the "Chosen on purpose" section), `PRODUCT.md`
@@ -48,9 +48,12 @@ A review that does not say what it read implies coverage it does not have.
 ## 2. Run the deterministic checks
 
 ```bash
-node <harness>/bin/check-copy-length.mjs
-node <harness>/bin/check-drift.mjs
+node <harness>/bin/check-copy-length.mjs --base=<base>
+node <harness>/bin/check-drift.mjs --base=<base>
 ```
+
+Always pass the `base:` from your prompt: without it the checks read the whole branch and repeat findings the
+session already declined.
 
 Report each flagged line as a finding, quoting it. A check that says NOT RUN or NOT A CLEAN PASS has measured
 nothing: say so, and read that copy yourself.
@@ -61,8 +64,9 @@ For every changed surface, name the existing surface that does the same job else
 component used elsewhere (`rg -l "<ComponentName" .`), the same kind of act in another area (the other Remove, the
 other toasts, the other empty states), or the pattern the rules file names. Compare element by element: the
 component, its props (size, colour, icon, variant), its copy (length, sentence shape, verb, terminology), its
-placement and spacing. Every difference is a finding unless the change has a reason for it; "the code was written
-differently" is not a reason. Cite both files with line numbers.
+placement and spacing. A difference a reader of the two screens would notice is a finding unless the change has a
+reason for it; "the code was written differently" is not a reason. Differences only visible in the code are not.
+Cite both files with line numbers.
 
 ## 4. Check the settled rules
 
@@ -109,8 +113,12 @@ of a change that added rows to a page. Work out the route from the file's place 
 
 ```bash
 node <harness>/bin/check-a11y.mjs /<changed-route>
-node <harness>/bin/shoot.mjs /<changed-route> /<sibling-route>
+node <harness>/bin/shoot.mjs /<changed-route>
 ```
+
+Shoot the sibling's route too only when the comparison you are making is visual (placement, spacing, weight); a
+copy or behaviour comparison reads from the code. Both scripts run in the modes the project lists in `modes`; each
+run of a page costs seconds, so name only the pages the change renders on.
 
 If `.claude/design-harness.json` names a `screenshot` command (a project tool that signs in as a persona or seeds
 state), use it instead of `shoot.mjs`, with `{route}` replaced. Open every image with Read and judge the picture,

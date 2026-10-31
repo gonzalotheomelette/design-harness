@@ -21,9 +21,10 @@ designer before a reviewer has compared it with what already exists.
 - **The best public design skills**, pinned to a commit that was read and checked: Anthropic's frontend-design,
   Impeccable, Google Chrome's modern-web-guidance and Emil Kowalski's design-engineering skills.
 
-How well the reviewer works, measured blind against a designer's real corrections, is in
-[docs/benchmark.md](docs/benchmark.md): 11 of 18 corrections caught, 11 findings a review, 89 seconds median, ahead
-of every public reviewer tested.
+How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits: on 7 cases from one
+project, scored blind, it caught 11 of 18 real corrections (Opus caught 10, within noise of each other), against 8 for
+Impeccable's method and 4 for OneRedOak's. Treat that as a promising first measure, not a proof: a second project and
+repeated runs are still to come.
 
 - **Product work in the same place.** A requirement per surface (`docs/product/`), a decision log and an open
   questions register sit beside the design files. The reviewer checks each surface against its requirement, so a
@@ -99,7 +100,7 @@ your-project/
 .claude-plugin/marketplace.json     the "omelette" marketplace: design-harness plus the pinned external plugins
 plugins/design-harness/
   hooks/                            review-before-show (Stop + UserPromptSubmit)
-  agents/ui-review.md               the reviewer (Sonnet: fastest and most accurate in the benchmark)
+  agents/ui-review.md               the reviewer (Sonnet: as accurate as Opus in the benchmark, and faster)
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
   skills/learn/                     a correction becomes a rule
@@ -114,6 +115,19 @@ docs/benchmark.md                   method and results
 
 ## Updating
 
-Pins are deliberate: an external skill changes only when its `sha` here is moved, after reading what changed.
-Move a pin, bump `version` for design-harness when it changes, and re-run the benchmark when the reviewer, its
+Pins are deliberate: an external skill changes only when its `sha` here is moved, after reading what changed, and a
+project changes harness version only when the `ref` tag in its `.claude/settings.json` is moved.
+
+To release: run the tests (`node --test tests/harness.test.mjs`), bump `version` in both manifests, update the `ref`
+in `skills/kickoff/templates/settings.json`, commit, and tag `vX.Y.Z`. Re-run the benchmark when the reviewer, its
 rules or its model change.
+
+## What it does not cover yet
+
+- Windows: the dev-server proof uses `lsof` and the browser search knows macOS and Linux paths.
+- Copy length in Vue, Svelte and Astro files: the check names them instead of measuring them.
+- Route inference assumes file-based routing (Next.js); other routers need the route named by hand.
+- A day-one stack scaffold, CI workflow and preview deploys: the kickoff sets up identity and product files, not
+  the app itself.
+- State that only exists after an action in the session: screenshots of a fresh page cannot show it, and the
+  reviewer says so.

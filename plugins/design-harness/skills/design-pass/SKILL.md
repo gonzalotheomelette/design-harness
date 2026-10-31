@@ -33,9 +33,10 @@ product must read as the best of its category before it reads as anything distin
 
 ## 4. Look at it
 
-Screenshot the surface at desktop and phone width, light and dark, and open the images. Most corrections are
-second-order effects of your own edit, in the region beside the one you meant to change. The browser pane can
-stall transitions; prefer a real Chromium (`npx playwright screenshot`) for proof.
+Screenshot the surface at desktop and phone width, in each colour mode the product ships, and open the images.
+Most corrections are second-order effects of your own edit, in the region beside the one you meant to change. Use
+the project's `screenshot` command when it names one, else `node <harness>/bin/shoot.mjs /<route>` from the
+project root; the browser pane can stall transitions, so a picture from it is not proof.
 
 ## 5. Let the reviewer read it
 

@@ -11,8 +11,9 @@ Review files for compliance with Vercel's Web Interface Guidelines.
 
 ## How it works
 
-1. Fetch the latest guidelines, fresh each time:
-   `https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md`
+1. Fetch the guidelines at the commit this harness pinned (moved deliberately, after reading what changed, like the
+   other pins in the marketplace):
+   `https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/434b7f91364665f2f733b310ec54809bf8f37937/command.md`
 2. Read the files named (or the branch's changed rendered files, from `git diff --name-only` against the base).
 3. Check every rule in the fetched guidelines.
 4. Report findings in the terse `file:line` format the guidelines specify.

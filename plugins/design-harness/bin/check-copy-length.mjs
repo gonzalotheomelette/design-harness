@@ -23,20 +23,16 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseOf, git, loadConfig, matchesAny, pathspec, projectRequire } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, changedFiles, git, loadConfig, matchesAny, pathspec, projectRequire } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
 const args = process.argv.slice(2)
 const SURVEY = args.includes('--survey')
 const ALL = args.includes('--all') || SURVEY
-const baseArg = args.find((a) => a.startsWith('--base='))?.slice(7)
 
+// Required only once there is something to parse, so the files it cannot read are named first, whatever happens.
 const ts = projectRequire(root, 'typescript')
-if (!ts) {
-  console.log('copy-length: NOT RUN. This project has no typescript package to parse with (npm i -D typescript).')
-  process.exit(0)
-}
 
 const LIMITS = {
   button: 4,
@@ -148,10 +144,19 @@ let files
 if (ALL) {
   files = git(root, 'ls-files', '--', ...pathspec(COPY_FILES)).split('\n').filter(Boolean)
 } else {
-  scope = addedLines(root, baseArg ?? baseOf(root, config), COPY_FILES)
+  const base = baseArg(config, root)
+  scope = addedLines(root, base, COPY_FILES)
   files = [...scope.keys()]
+  // Rendered files this parser cannot read (Vue, Svelte, Astro): name them, so silence is never read as a pass.
+  const unreadable = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, COPY_FILES) && !/\.(css|scss)$/.test(f))
+  if (unreadable.length) console.log(`copy-length: NOT RUN on ${unreadable.length} file(s) it cannot parse (${unreadable.slice(0, 5).join(', ')}); read their copy by hand.`)
 }
 files = files.filter((f) => existsSync(join(root, f)) && !matchesAny(f, EXCLUDE))
+if (!ts) {
+  if (files.length) console.log(`copy-length: NOT RUN on ${files.length} file(s): this project has no typescript package to parse with (npm i -D typescript).`)
+  else console.log('copy-length: nothing it can parse changed')
+  process.exit(0)
+}
 
 let items = files.flatMap(collect)
 if (scope) {

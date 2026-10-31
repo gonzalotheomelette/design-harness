@@ -3,7 +3,7 @@
 // which change they are looking at.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { createRequire } from 'node:module'
 
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -22,11 +22,36 @@ export const DEFAULTS = {
   copyRegister: null,
   devServer: 'http://localhost:3000',
   baseBranch: null,
-  maxReviewsPerMessage: 2,
+  // One review per message from the person: a second review of the same turn mostly re-reads the first one's fixes,
+  // and each costs a minute and a share of the plan.
+  maxReviewsPerMessage: 1,
+  // The colour modes the product ships. Screenshots and accessibility run in each; a light-only product says so here.
+  modes: ['light', 'dark'],
 }
 
+// The default output buffer (1 MB) is smaller than the diff of one large refactor, and the hook then threw on every
+// stop. 256 MB is far past any diff worth reviewing.
 export function git(root, ...args) {
-  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 })
+}
+
+export function gitDirOf(root) {
+  const d = git(root, 'rev-parse', '--git-dir').trim()
+  return isAbsolute(d) ? d : join(root, d)
+}
+
+// The working state as a tree object, untracked files included, written through a scratch index so the real one is
+// untouched. Every check compares trees, so a new file, an edit and a monorepo subfolder all read the same way.
+export function snapshot(root) {
+  const env = { ...process.env, GIT_INDEX_FILE: join(gitDirOf(root), 'design-harness.index') }
+  const run = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })
+  try {
+    run('read-tree', 'HEAD')
+  } catch {
+    run('read-tree', '--empty')
+  }
+  run('add', '-A', '--', '.')
+  return run('write-tree').trim()
 }
 
 // The project's settings, or null when the harness has not been set up here (the hook then stays silent).
@@ -58,11 +83,14 @@ export function baseOf(root, config) {
 
 export const pathspec = (globs) => globs.map((g) => `:(glob)${g}`)
 
-// Lines added since `base`, per file; untracked files count as wholly added.
+// Lines added between `base` (a commit or a tree) and the working state, per file, paths relative to `root`.
+// `--relative` keeps a monorepo package's paths joinable to its own folder: without it, git reported them from the
+// repository root and every file silently failed to open, so the checks read nothing and passed.
 export function addedLines(root, base, globs) {
   const map = new Map()
   let file = null
-  for (const line of git(root, 'diff', '-U0', base, '--', ...pathspec(globs)).split('\n')) {
+  const now = snapshot(root)
+  for (const line of git(root, 'diff', '--relative', '-U0', base, now, '--', ...pathspec(globs)).split('\n')) {
     if (line.startsWith('+++ ')) {
       file = line.startsWith('+++ b/') ? line.slice(6) : null
       continue
@@ -75,11 +103,18 @@ export function addedLines(root, base, globs) {
       for (let i = 0; i < count; i++) map.get(file).add(start + i)
     }
   }
-  for (const f of git(root, 'ls-files', '--others', '--exclude-standard', '--', ...pathspec(globs)).split('\n').filter(Boolean)) {
-    map.set(f, 'all')
-  }
   return map
 }
+
+// Every file under `globs` that differs between `base` and the working state, deletions left out.
+export function changedFiles(root, base, globs) {
+  return git(root, 'diff', '--relative', '--name-only', '--diff-filter=d', base, snapshot(root), '--', ...pathspec(globs))
+    .split('\n')
+    .filter(Boolean)
+}
+
+// The `--base=` a check was given, or the branch's base.
+export const baseArg = (config, root) => process.argv.find((a) => a.startsWith('--base='))?.slice(7) || baseOf(root, config)
 
 // A package resolved from the PROJECT, not from the plugin, which ships no node_modules of its own.
 export function projectRequire(root, name) {
@@ -153,12 +188,18 @@ export async function openBrowser(root, config) {
   return null
 }
 
+// `**/` is any depth, `**` anything, `*` anything within one folder. Placeholders first: the single-star step used to
+// rewrite the `.*` the double-star step had just written, so `**/theme.css` matched one folder deep and no deeper,
+// and a theme file at src/styles/theme.css was flagged as drift. tests/lib.test.mjs holds the cases.
 export function globToRegExp(glob) {
   const re = glob
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*\//g, '(?:.*/)?')
-    .replace(/\*\*/g, '.*')
+    .replace(/\*\*\//g, '\u0000')
+    .replace(/\*\*/g, '\u0001')
     .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '[^/]')
+    .replace(/\u0000/g, '(?:.*/)?')
+    .replace(/\u0001/g, '.*')
   return new RegExp(`^${re}$`)
 }
 export const matchesAny = (file, globs) => globs.some((g) => globToRegExp(g).test(file))

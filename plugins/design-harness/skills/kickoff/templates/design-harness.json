@@ -15,10 +15,14 @@
   "design": "DESIGN.md",
   "product": "PRODUCT.md",
   "devServer": "http://localhost:3000",
-  "maxReviewsPerMessage": 2,
+  "maxReviewsPerMessage": 1,
   "copyLimits": {},
   "requirements": "docs/product",
   "decisions": "docs/decision-log.md",
   "questions": "docs/open-questions.md",
-  "screenshot": null
+  "screenshot": null,
+  "modes": [
+    "light",
+    "dark"
+  ]
 }
