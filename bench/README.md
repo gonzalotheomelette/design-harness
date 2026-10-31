@@ -1,0 +1,38 @@
+# Rerunning the benchmark
+
+Everything needed to repeat the 2026-10-31 run, except the two projects' code: `cases.tsv` names each case's
+introducing commit and the fix that corrected it, in the website (`gonzalotheomelette/omelette-website`) and the client prototype.
+The website's answer keys and reports are here. The client prototype's quote a client's code, so only their scores are.
+
+## Steps
+
+1. Clone each project somewhere disposable (`git clone --shared` leaves the original untouched) and check out each
+   case's introducing commit in its own worktree. For a the client prototype case, symlink the project's `node_modules` in (the copy
+   check parses with its TypeScript) and give the worktree `.claude/design-harness.json` with `{"allowPalette": true}`,
+   the setting that project would have.
+2. Write each case's answer key: the fix commit's message and what it removed and added
+   (`scripts/find-introducing-commit.py <fix>` blames the removed lines to find the introducing commit).
+3. Write each case's packet, as the hook does: `node scripts/make-packet.mjs <worktree> <packet dir> [src]`.
+4. Run the reviewer three times per case, each a fresh Sonnet agent with this prompt:
+
+   > You are acting as the `ui-review` agent in a benchmark. Read your instructions in full first:
+   > `<harness>/agents/ui-review.md`, and follow them, with these adjustments: the project is checked out at
+   > `<worktree>`, read-only; use only Read, Grep and Glob on it. Your prompt: packet: `<packet>`; fingerprint:
+   > `<case>-run<n>`; what the change is for: "<from cases.tsv>". When done, write your complete report to
+   > `<reports>/<case>-run<n>.md`, then reply with one line: how many findings you reported.
+
+5. `python3 scripts/make-judging.py <dir>` shuffles each case's reports (three runs of this version, one of the
+   previous) under letters A to D and strips the lines that name a version.
+6. One Opus judge per case, blind:
+
+   > key.md says what the designer corrected after a commit. A.md to D.md are four independent reviews of the commit
+   > that introduced the slips. 1. List the distinct corrections in a design reviewer's territory (copy, consistency
+   > between surfaces, generated-looking devices, clarity, visual treatment), leaving out pure engineering. 2. For each
+   > report and correction mark HIT (same element, same reason or direction of fix), PARTIAL (same element for another
+   > reason, or the right reason on a neighbouring element) or MISS. 3. Per report: findings, and how many are not worth
+   > a designer's time. Be strict and apply one standard to every report. Write scores.json.
+
+7. `python3 scripts/tally.py <dir>` unblinds and totals.
+
+A change that lowers the hit rate or raises the share of findings not worth the time, on either project, is a
+regression.

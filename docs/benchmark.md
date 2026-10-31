@@ -1,7 +1,8 @@
 # How well the reviewer works, and how it was measured
 
-Measured 2026-10-31 on the the client prototype prototype, where this harness was first built. Re-run it whenever the reviewer,
-its rules or its model change; a change that lowers the hit rate or raises the noise is a regression.
+Measured 2026-10-31 on two projects: The client prototype, where this harness was built, and Omelette's website, held out from
+it. Re-run it whenever the reviewer, its rules or its model change; `bench/` holds the cases, scripts, prompts and
+scores, and `bench/README.md` the steps. A change that lowers the hit rate or raises the noise is a regression.
 
 ## Method
 
@@ -19,7 +20,42 @@ its rules or its model change; a change that lowers the hit rate or raises the n
    fix), PARTIAL (same element, other reason; or right reason, neighbouring element), MISS. Per report: total
    findings, and how many are not worth a designer's time.
 
-## Results (7 cases, 18 corrections)
+## Results for 0.7.0: three runs per case, two projects
+
+13 cases: the 7 the client prototype cases below and 6 from the website, chosen by the same rule (a commit that removed copy or a
+device the designer objected to, whose removed lines one earlier commit wrote; three candidates were dropped because
+the wording built up over several commits, came from the first commit, or the correction was to an image). The
+website's messages rarely quote the designer, so its cases rest on what the fix did more than on his words. Each case
+was reviewed three times by the shipped reviewer (Sonnet, reading the packet the hook writes, no dev server) and once
+by 0.6.0, and one Opus judge per case scored all four reports, shuffled and stripped of anything naming a version.
+These judges listed corrections more finely than the first round's (32 on the client prototype where it counted 18), so compare
+within this table, not with the one below.
+
+| Project | Reviewer | Hits | Partial | Miss | Findings per review | Not worth the time |
+|---|---|---|---|---|---|---|
+| the client prototype (32 corrections) | 0.7.0, run 1 | 11 | 9 | 12 | 13.4 | 14% |
+| | 0.7.0, run 2 | 11 | 8 | 13 | 12.6 | 12% |
+| | 0.7.0, run 3 | 14 | 8 | 10 | 11.9 | 13% |
+| | 0.6.0 | 7 | 7 | 18 | 11.7 | 15% |
+| Website, held out (19) | 0.7.0, run 1 | 2 | 6 | 11 | 11.0 | 42% |
+| | 0.7.0, run 2 | 2 | 5 | 12 | 9.7 | 40% |
+| | 0.7.0, run 3 | 2 | 6 | 11 | 9.7 | 28% |
+| | 0.6.0 | 1 | 4 | 14 | 8.2 | 43% |
+
+What it says:
+
+- **Run to run, the reviewer moves by about three hits in 32**, so a difference smaller than that between versions is
+  noise. 0.7.0 over 0.6.0 (11 to 14 against 7) is larger than that, and held on the held-out project too (2 against 1).
+- **It is a copy reviewer.** On the client prototype, where the corrections were mostly wordy copy and explainer lines, it found a
+  third to nearly half outright and most of the rest in part, with few findings wasted. On the website, where the
+  corrections were mostly visual (line breaks, a 44px gap, two animations stacked, a near-black that should match) or
+  product calls code cannot show ("sprint" to "collaboration", dropping a privacy line, trimming the nav), it found 2
+  of 19 outright, and two in five of its findings were not worth the time. Its partial hits there were the copy and
+  chrome ones: the draft banner, the eyebrows, the founder label.
+- **A held-out project is where the honest number lives.** The copy limits were measured on the client prototype's approved copy,
+  and the gap between the two projects is mostly that home advantage plus the kind of correction each one got.
+
+## First comparison, with other reviewers (7 cases, 18 corrections)
 
 | Reviewer | Hits | Partial | Miss | Findings per review | Not worth the time | Median time |
 |---|---|---|---|---|---|---|
@@ -48,13 +84,18 @@ script the change edited, `.npmrc`, and an `rg` flag. From 0.7.0 the reviewer ha
 and the session takes the screenshots.
 
 In eight real review reports, only one repeated its fingerprint as instructed, so the hook does not depend on it: a
-review counts when Claude Code records the call as completed, and an errored call does not.
+review counts when Claude Code records the call as completed and its report carries the packet's token. All 39
+benchmark reports on 0.7.0 opened with their token.
+
+0.7.0's packet flow, live: a headless session made a wordy toast, the hook held the turn and wrote the packet, the
+reviewer (Read, Grep and Glob, all three confirmed working in a plugin agent) flagged the toast against its sibling
+and questioned a claim the code did not back, the review was logged, and the turn took 37 seconds.
 
 ## Limits
 
-Seven cases from one project, one run each, so run-to-run variance is unknown and 11 against 10 is noise. The cases
-were chosen for the kinds of correction this reviewer targets, and its copy limits were measured on the same
-project's approved copy, so some of the answer was in the instrument: more than an ordinary home advantage. The judge
-is a model. The configuration measured reviewed whole commits without a dev server; the shipped one reviews a turn's
-change and looks at the page, which these numbers do not cover. Next: repeat each case three times and add a second
-project held out from the rules.
+Thirteen cases, three runs each, one model judge per case: enough to see run-to-run spread and a version difference
+of the size measured, not small ones. The website is held out from the copy limits and the review rules, though not
+from the designer's taste, which shaped both projects. No run had a dev server, so nothing here measures the
+screenshots the shipped flow adds, which is exactly where the website's misses sit; the next measurement is the same
+website cases with its dev server up. In this session the benchmark's stand-in reviewers had no Grep or Glob and
+searched with read-only grep instead, the same search by another tool.

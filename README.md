@@ -24,10 +24,11 @@ makes after the review are read by the next one.
 - **The best public design skills**, pinned to a commit that was read and checked: Anthropic's frontend-design,
   Impeccable, Google Chrome's modern-web-guidance and Emil Kowalski's design-engineering skills.
 
-How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits: on 7 cases from one
-project, scored blind, it caught 11 of 18 real corrections (Opus caught 10, within noise of each other), against 8 for
-Impeccable's method and 4 for OneRedOak's. Treat that as a promising first measure, not a proof: a second project and
-repeated runs are still to come.
+How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, scored blind
+over three runs: it is a good copy reviewer and a weak visual one. On the client prototype's corrections, mostly wordy copy, it
+caught 11 to 14 of 32 outright and most of the rest in part, with one finding in eight not worth the time. On a
+held-out project whose corrections were mostly visual and product calls, with no dev server for pictures, it caught
+2 of 19 outright. The pictures the shipped flow adds are not measured yet.
 
 - **Product work in the same place.** A requirement per surface (`docs/product/`), a decision log and an open
   questions register sit beside the design files. The reviewer checks each surface against its requirement, so a
@@ -103,7 +104,7 @@ your-project/
 .claude-plugin/marketplace.json     the "omelette" marketplace: design-harness plus the pinned external plugins
 plugins/design-harness/
   hooks/                            review-before-show (Stop + UserPromptSubmit): the turn gate and the review packet
-  agents/ui-review.md               the reviewer (Sonnet: as accurate as Opus in the benchmark, and faster)
+  agents/ui-review.md               the reviewer: Sonnet, Read, Grep and Glob, no shell
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
   skills/learn/                     a correction becomes a rule
@@ -114,6 +115,7 @@ plugins/design-harness/
                                     project root; they use the project's own Playwright or Puppeteer)
 dotfiles/CLAUDE.md                  Gonzalo's working rules for every project; install.sh links it
 docs/benchmark.md                   method and results
+bench/                              the benchmark's cases, scripts, prompts and scores, to rerun it
 ```
 
 ## Updating
