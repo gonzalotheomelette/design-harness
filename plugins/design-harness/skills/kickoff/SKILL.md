@@ -152,7 +152,9 @@ Copy from `templates/`:
 - `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack,
   and `modes` listing the colour modes the product ships. The template starts with `light` alone: add `dark` once
   DESIGN.md defines the dark twin of every colour token, so nothing is screenshotted or checked in a mode it has no
-  palette for. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. `themeFiles`
+  palette for. `screenshots` stays `false`: the accessibility and line-break checks run whenever the dev server is
+up, but screenshots in every review cost minutes and, measured, caught nothing more; turn them on for a project
+where layout is the work. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. `themeFiles`
   are globs: make sure one matches wherever step 5 wrote the theme. Commit the file: the harness reads its settings
   from the last commit, so a change cannot loosen them on the way through.
 - A project tool that takes screenshots as a signed-in persona, or a browser outside the usual places, goes in

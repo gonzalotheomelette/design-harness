@@ -10,8 +10,9 @@ makes after the review are read by the next one.
 - **Review before show.** When a Claude Code turn changes anything rendered, a Stop hook asks for a fresh-context
   review of that exact change before the turn ends, once per message (a session that will not run it is let through
   with a note saying so, so it can never loop). The hook runs the copy-length and drift checks on the change
-  and hands the reviewer a packet; the session adds screenshots and an accessibility run when this checkout's dev
-  server is up. The reviewer compares each surface with its closest sibling, checks the project's settled rules and
+  and hands the reviewer a packet; when this checkout's dev server is up, the session adds the accessibility and
+  line-break checks, and screenshots for projects that switch them on (`"screenshots": true`; off by default, since
+  measured they cost minutes a review and caught nothing more). The reviewer compares each surface with its closest sibling, checks the project's settled rules and
   an AI-look register, reads the packet, and reports. It has no shell, so instructions planted in the code it reads
   have nothing to run. The session fixes what it agrees with and says what it left; the checks read those fixes once
   before the turn ends, and the next review reads them in full.

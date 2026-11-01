@@ -4,7 +4,7 @@
 // A green here proves the behaviour; where a check can pass by measuring nothing, the case asserts the population too.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { execFile, execFileSync, spawnSync } from 'node:child_process'
+import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
@@ -922,4 +922,25 @@ test('the break check reads each block at three widths and names what reads badl
   assert.match(r.stdout, /\/pricing \[phone\] h2 "Before we get \/ started\.": last line is one word/)
   assert.doesNotMatch(r.stdout, /\[desktop\]/)
   assert.match(r.stdout, /4 text block\(s\) read across 1 page\(s\) at 3 widths, 1 bad break\(s\)/)
+})
+
+test('with the dev server up, the checks always run and screenshots only when the project opts in', async () => {
+  const ask = async (screenshots) => {
+    const port = 4400 + Math.floor(Math.random() * 500)
+    const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx'], devServer: `http://localhost:${port}`, ...(screenshots ? { screenshots: true } : {}) })
+    const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: dir, stdio: 'ignore' })
+    try {
+      for (let i = 0; i < 40 && !check(dir, 'server-of.mjs').stdout.includes(': yes'); i++) await new Promise((r) => setTimeout(r, 100))
+      hook(dir, 'UserPromptSubmit')
+      write(dir, { 'src/a.tsx': 'y\n' })
+      return askFor(dir)
+    } finally {
+      server.kill()
+    }
+  }
+  const off = await ask(false)
+  assert.match(off, /check-a11y\.mjs/, off)
+  assert.match(off, /check-breaks\.mjs/, off)
+  assert.doesNotMatch(off, /shoot\.mjs/, off)
+  assert.match(await ask(true), /shoot\.mjs \/<route> --at=/)
 })

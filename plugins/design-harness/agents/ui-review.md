@@ -104,16 +104,17 @@ grep `DESIGN.md` and the rules file before flagging.
 
 ## 7. Look at it, and check accessibility
 
-`server.txt` says whether the dev server serves this checkout. When it does, the session puts screenshots and the
-accessibility run in `browser.txt` before calling you. Open every image it lists with Read and judge the picture,
-the changed surface beside its sibling: if a problem shows in a screenshot, it is real, whatever the code says.
+`server.txt` says whether the dev server serves this checkout. When it does, the session puts the accessibility
+run and the line-break check in `browser.txt` before calling you, and screenshots when the project has switched them
+on (`screenshots` in the settings). Open every image it lists with Read and judge the picture, the changed surface
+beside its sibling: if a problem shows in a screenshot, it is real, whatever the code says.
 Report each serious or critical accessibility violation as a finding, and each bad line break the break check
 names (a last line of one word, a line ending on a word that leans on the next, a sentence starting on a line's last
 word), with the width it happens at.
 
-When there is no `browser.txt`, say why in your population line (no server, or the session did not take them), and
-name the pages a screenshot would have needed. Reading code missed every slip in the benchmark that only showed in a
-picture, so a review without pictures says so plainly.
+When there is no `browser.txt`, say why in one line of your population (no server, or the session did not run the
+checks). Without pictures, spacing, colour matches and motion are not judged by anyone: say so for a change that
+alters them, rather than implying the code read covers it.
 
 ## 8. Report
 

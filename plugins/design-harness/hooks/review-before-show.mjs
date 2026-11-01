@@ -379,10 +379,14 @@ function main() {
               ? `the ui-review you ran did not open its packet (its report lacks the review-token line); run it again. `
               : `the ui-review you started has not reported, and a review still running in the background does not count. `
             : '') +
+          // Screenshots only when the project asks for them: on the 2026-11-01 benchmark they added 1.5 to 4 minutes a
+          // review and caught none of the visual corrections. The two measurements stay on: seconds each, and the
+          // break check is what caught a visual class.
           (packet.serving
-            ? `1. The dev server serves this checkout, so take pictures of the pages this change renders with ${shoot}, and ` +
-              `run \`node ${HARNESS}/bin/check-a11y.mjs /<route>\` and \`node ${HARNESS}/bin/check-breaks.mjs /<route>\` on them, writing ` +
-              `all three outputs to ${packet.dir}/browser.txt. `
+            ? `1. The dev server serves this checkout, so run \`node ${HARNESS}/bin/check-a11y.mjs /<route>\` and ` +
+              `\`node ${HARNESS}/bin/check-breaks.mjs /<route>\` on the pages this change renders` +
+              (config.screenshots ? `, and take pictures of them with ${shoot}` : '') +
+              `, writing all the output to ${packet.dir}/browser.txt. `
             : '') +
           `${packet.serving ? '2' : '1'}. Run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) and ` +
           `wait for its report. Its prompt: "packet: ${packet.dir}", "fingerprint: ${fingerprint}", and one sentence on ` +

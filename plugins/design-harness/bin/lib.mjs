@@ -33,6 +33,9 @@ export const DEFAULTS = {
   // One review per message from the person: a second review of the same turn mostly re-reads the first one's fixes,
   // and each costs a minute and a share of the plan.
   maxReviewsPerMessage: 1,
+  // Screenshots in every review are opt-in: they cost 1.5 to 4 minutes a review and, measured on 2026-11-01, caught
+  // none of the visual corrections the code-only reviews missed. The accessibility and line-break checks run either way.
+  screenshots: false,
   // The colour modes the product ships. Screenshots and accessibility run in each; a light-only product says so here.
   modes: ['light', 'dark'],
 }
