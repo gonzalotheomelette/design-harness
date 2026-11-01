@@ -874,3 +874,23 @@ test('long text in a plain element is measured', () => {
   })
   assert.match(check(dir, 'check-copy-length.mjs').stdout, /a\.tsx:3 {2}text is 27 words/)
 })
+
+test('screenshots are the screen a visitor sees, scrolled a screen at a time, from the changed element when named', () => {
+  const dir = repo({ 'src/a.tsx': 'x' })
+  write(dir, {
+    'node_modules/puppeteer/package.json': '{"name":"puppeteer","main":"index.js"}',
+    'node_modules/puppeteer/index.js': `module.exports = { launch: async () => ({
+      newPage: async () => { let y = 0; return {
+        setViewport: async () => {}, emulateMediaFeatures: async () => {}, goto: async () => ({ status: () => 200 }),
+        evaluate: async (fn, arg) => { const src = String(fn); if (src.includes('scrollHeight')) return 5000; if (src.includes('querySelector')) return 3000; if (src.includes('scrollTo')) { y = Math.min(arg, 5000 - 900); return } return y },
+        screenshot: async ({ path }) => require('fs').writeFileSync(path, 'png'), close: async () => {} } },
+      close: async () => {} }) }`,
+  })
+  const r = check(dir, 'shoot.mjs', '/long', '--tiles=2')
+  assert.equal(r.status, 0, r.stdout + r.stderr)
+  assert.match(r.stdout, /long-desktop-light-01\.png {2}\(desktop, light, scrolled to 0px of 5000\)/)
+  assert.match(r.stdout, /long-desktop-light-02\.png {2}\(desktop, light, scrolled to 900px of 5000\)/)
+  assert.match(r.stdout, /more slice\(s\) below/)
+  const at = check(dir, 'shoot.mjs', '/long', '--at=#pricing', '--tiles=1')
+  assert.match(at.stdout, /scrolled to 2920px/, at.stdout)
+})

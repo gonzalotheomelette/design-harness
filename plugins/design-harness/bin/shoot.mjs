@@ -7,8 +7,11 @@
  * those. A project with its own screenshot tool (personas, seeded state) names it in `screenshot` in
  * .claude/design-harness.json and the reviewer uses that instead.
  *
- * Usage: node shoot.mjs <local url or /path> [more...]   (from the project root; local addresses only)
- * Prints the path of every image it wrote, in a temp folder.
+ * Usage: node shoot.mjs <local url, /path or project .html file> [more...] [--at=<css selector>] [--tiles=<n>]
+ *        (from the project root; local addresses only)
+ * Each page is captured as the screen a visitor sees, scrolled a screen at a time from the top, or from the element `--at` names, up to `--tiles`
+ * (default 6) per mode and width: a single full-page capture of a long page reached the reviewer at about 155px wide
+ * and could not be read. Prints the path of every image it wrote, in a temp folder, with the slice it covers.
  */
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -35,6 +38,8 @@ if (!browser) {
   console.log('shoot: NOT RUN. The project has neither playwright nor puppeteer (npm i -D playwright).')
   process.exit(2)
 }
+const AT = process.argv.find((a) => a.startsWith('--at='))?.slice(5) || null
+const TILES = Math.max(1, Number(process.argv.find((a) => a.startsWith('--tiles='))?.slice(8)) || 6)
 const out = mkdtempSync(join(tmpdir(), 'ui-review-'))
 let shots = 0
 let failed = 0
@@ -49,10 +54,25 @@ try {
           console.log(`  ${url} [${colorScheme}, ${label}]: could not load (${res?.error?.message ?? res?.status?.()})`)
           failed++
         } else {
-          const file = join(out, `${slug}-${label}-${colorScheme}.png`)
-          await page.screenshot(file)
-          console.log(`  ${file}`)
-          shots++
+          const height = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0))
+          let start = 0
+          if (AT) {
+            const top = await page.evaluate((sel) => {
+              const el = document.querySelector(sel)
+              return el ? el.getBoundingClientRect().top + window.scrollY : null
+            }, AT)
+            if (top === null) console.log(`  ${url} [${colorScheme}, ${label}]: nothing matches ${AT}; tiling from the top`)
+            else start = Math.max(0, Math.floor(top) - 80)
+          }
+          let n = 0
+          for (let y = start; y < height && n < TILES; y += viewport.height, n++) {
+            const file = join(out, `${slug}-${label}-${colorScheme}-${String(n + 1).padStart(2, '0')}.png`)
+            const at = await page.tile(file, y)
+            console.log(`  ${file}  (${label}, ${colorScheme}, scrolled to ${at}px of ${height})`)
+            shots++
+          }
+          const left = Math.ceil((height - start) / viewport.height) - n
+          if (left > 0) console.log(`  ${url} [${colorScheme}, ${label}]: ${left} more slice(s) below; use --at=<selector> to start lower`)
         }
         await page.close()
       }

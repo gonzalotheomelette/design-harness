@@ -337,6 +337,15 @@ export async function openBrowser(root, config) {
         return {
           goto: (url) => page.goto(url, { waitUntil: 'networkidle' }),
           screenshot: (path) => page.screenshot({ path, fullPage: true }),
+          // The screen as a visitor sees it scrolled to `y`, after a pause: a full-page capture of a long page reaches
+          // the reviewer shrunk to a sliver, and content that reveals on scroll is captured still hidden.
+          tile: async (path, y) => {
+            await page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y)
+            await page.waitForTimeout(700)
+            await page.screenshot({ path })
+            return page.evaluate(() => Math.round(window.scrollY))
+          },
+          evaluate: (fn, arg) => page.evaluate(fn, arg),
           axe: (tags) => new (axeLib.default ?? axeLib.AxeBuilder)({ page }).withTags(tags).analyze(),
           close: () => page.close(),
         }
@@ -364,6 +373,13 @@ export async function openBrowser(root, config) {
         return {
           goto: (url) => page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 }),
           screenshot: (path) => page.screenshot({ path, fullPage: true }),
+          tile: async (path, y) => {
+            await page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y)
+            await new Promise((r) => setTimeout(r, 700))
+            await page.screenshot({ path })
+            return page.evaluate(() => Math.round(window.scrollY))
+          },
+          evaluate: (fn, arg) => page.evaluate(fn, arg),
           axe: (tags) => new (axeLib.AxePuppeteer ?? axeLib.default)(page).withTags(tags).analyze(),
           close: () => page.close(),
         }

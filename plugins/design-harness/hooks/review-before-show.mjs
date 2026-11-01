@@ -365,7 +365,7 @@ function main() {
   const packet = existsSync(tokenOf(fingerprint)) && existsSync(join(packetOf(fingerprint), 'server.txt')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI, state, carriedDiff)
   const shoot = config.screenshot
     ? `your screenshot command from .claude/design-harness.local.json (${config.screenshot})`
-    : `\`node ${HARNESS}/bin/shoot.mjs /<route>\``
+    : `\`node ${HARNESS}/bin/shoot.mjs /<route> --at=<css selector of the changed element>\``
 
   const list = files.slice(0, 10).join(', ') + (files.length > 10 ? `, and ${files.length - 10} more` : '')
   process.stdout.write(
