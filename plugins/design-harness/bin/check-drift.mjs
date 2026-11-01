@@ -27,7 +27,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseArg, changedFiles, loadConfig, matchesAny, harnessTypescript } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, filesWithAdditions, loadConfig, matchesAny, harnessTypescript } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
@@ -232,7 +232,7 @@ for (const [file, lines] of scope) {
 console.log(`drift: ${read} added line(s) read across ${scope.size} rendered file(s); theme files exempt`)
 // The population from git's list of changed files, read independently of the line parser: when git's output was not
 // what the parser expects, the parser found nothing and the check used to pass.
-const unread = changedFiles(root, base, config.ui).filter((f) => !matchesAny(f, config.themeFiles)).length
+const unread = filesWithAdditions(root, base, config.ui).filter((f) => !matchesAny(f, config.themeFiles)).length
 if (!read && unread) {
   console.log(`drift: NOT A CLEAN PASS. ${unread} changed file(s) could not be read; check them by hand.`)
   process.exit(2)

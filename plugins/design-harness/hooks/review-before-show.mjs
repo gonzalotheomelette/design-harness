@@ -68,6 +68,18 @@ const TREE = [...config.ui, ...DOCS]
 const packetOf = (fingerprint) => join(gitDir, 'design-harness', 'review', fingerprint)
 // The token is kept outside the packet; the reviewer finds it only on the first line of change.diff.
 const tokenOf = (fingerprint) => join(gitDir, 'design-harness', 'tokens', fingerprint)
+const readLog = () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean) : [])
+const isLogged = (fp) => readLog().some((l) => l.split(' ')[0] === fp)
+// Each review is logged with the branch it was made on, so the fallback range (no turn snapshot) never starts from a
+// tree on another branch.
+let branch = 'detached'
+try {
+  branch = git(root, 'symbolic-ref', '--short', '-q', 'HEAD').trim() || 'detached'
+} catch {}
+const logReview = (fp, tree) => {
+  appendFileSync(logPath, `${fp} ${tree} ${branch}\n`)
+  keepTree(root, 'reviewed', tree)
+}
 // A harness check run on this project, as the hook: { code, out }.
 const runCheck = (script, ...args) => {
   try {
@@ -89,23 +101,30 @@ try {
     const turnStart = snapshot(root, TREE)
     keepTree(root, 'turn', turnStart)
     // Work the last message left unreviewed (the cap was reached, the session stopped without the review, or this
-    // message was queued while that turn was still working) is carried into this message's range. Without it, a new
-    // turn start drew the line past those edits and they were never reviewed. Anything else between messages (a pull,
-    // a merge, the person's own edits) is not this session's work and stays out of the range.
-    // "Left unreviewed" is measured to where the last message's turn ended (`endTree`, written at each stop), so the
-    // person's own edits, a pull or a branch switch since then never count; a message queued before that turn
-    // stopped has no end yet, and is measured to now.
+    // message was queued while that turn was still working) is carried into this message's review as its own diff,
+    // from where that work began to where that turn stopped (`endTree`, written at each stop; a message queued before
+    // any stop is measured to now). Carried as a diff, not as an earlier start for this turn's range: a start let
+    // everything between the messages in (a merge, a branch switch, the person's own edits).
     const prev = readJson(statePath, {})
-    const prevFrom = prev.reviewed ? prev.askedTree : prev.carry ?? prev.turnStart
+    // A review that reported after the last stop (the next message arrived first) is recorded now, so its work is
+    // not carried and reviewed twice.
+    if (prev.lastBlocked && !prev.reviewed && prev.askedTree && (isLogged(prev.lastBlocked) || reviewOf(prev.lastBlocked).reported)) {
+      if (!isLogged(prev.lastBlocked)) logReview(prev.lastBlocked, prev.askedTree)
+      prev.reviewed = true
+    }
     const prevEnd = treeExists(root, prev.endTree) ? prev.endTree : turnStart
     const UI = pathspec(config.ui)
-    let carry = null
-    if (prevFrom && treeExists(root, prevFrom) && gitDiff(root, '--relative', '--name-only', prevFrom, prevEnd, '--', ...UI).trim())
-      carry = prevFrom
-    keepTree(root, 'carry', carry ?? turnStart)
+    const ranges = prev.reviewed ? [{ from: prev.askedTree, to: prevEnd }] : [...(prev.carried ?? []), { from: prev.turnStart, to: prevEnd }]
+    const carried = ranges
+      .filter((r) => treeExists(root, r.from) && treeExists(root, r.to) && gitDiff(root, '--relative', '--name-only', r.from, r.to, '--', ...UI).trim())
+      .slice(-3)
+    carried.forEach((r, i) => {
+      keepTree(root, `carried-${i}-from`, r.from)
+      keepTree(root, `carried-${i}-to`, r.to)
+    })
     // The person's own words go to the reviewer: the session's one-line summary of its own work is the framing a
     // fresh reader is there to avoid.
-    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart, carry, request: String(input.prompt ?? '').slice(0, 6000) }))
+    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart, carried, request: String(input.prompt ?? '').slice(0, 6000) }))
     process.exit(0)
   }
   if (input.hook_event_name && input.hook_event_name !== 'Stop') process.exit(0)
@@ -157,7 +176,7 @@ function reviewOf(fingerprint) {
 }
 
 // The packet the reviewer reads instead of running anything: the change, the checks on it, and the server's state.
-function writePacket(fingerprint, from, now, UI, state) {
+function writePacket(fingerprint, from, now, UI, state, carriedDiff = '') {
   const dir = packetOf(fingerprint)
   mkdirSync(dir, { recursive: true })
   const token = randomBytes(8).toString('hex')
@@ -170,6 +189,7 @@ function writePacket(fingerprint, from, now, UI, state) {
       '\n' +
       gitDiff(root, '--relative', from, now, '--', ...UI),
   )
+  if (carriedDiff.trim()) writeFileSync(join(dir, 'carried.diff'), carriedDiff)
   const copy = runCheck('check-copy-length.mjs', `--base=${from}`)
   const drift = runCheck('check-drift.mjs', `--base=${from}`)
   writeFileSync(join(dir, 'checks.txt'), `${copy.out}\n${drift.out}`)
@@ -191,6 +211,7 @@ function writePacket(fingerprint, from, now, UI, state) {
       `- base: ${from}`,
       `- change.diff: the change, \`git diff --relative ${from} ${now}\`, new files included, with its --stat on top`,
       '- checks.txt: copy length and drift on exactly this change, run by the hook',
+      ...(carriedDiff.trim() ? ["- carried.diff: work the previous message changed and nobody reviewed; review it with the change"] : []),
       ...(docs.trim() ? ["- docs.diff: this change ALSO edited the project's own documents (DESIGN.md, the rules, a requirement); see your instructions"] : []),
       '- request.md: what the person asked for this turn, in their own words',
       "- settings.json: the harness settings in effect: the project's as last committed (the working copy only before the first commit), plus this machine's local ones",
@@ -222,18 +243,6 @@ function main() {
   keepTree(root, 'end', now)
   save()
   const changedSince = (from) => gitDiff(root, '--relative', '--name-only', from, now, '--', ...UI).split('\n').filter(Boolean)
-  const readLog = () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean) : [])
-  const isLogged = (fp) => readLog().some((l) => l.split(' ')[0] === fp)
-  // Each review is logged with the branch it was made on, so a branch switch starts the next range from the turn,
-  // not from a tree on another branch (which made the next review read the whole difference between branches).
-  let branch = 'detached'
-  try {
-    branch = git(root, 'symbolic-ref', '--short', '-q', 'HEAD').trim() || 'detached'
-  } catch {}
-  const logReview = (fp, tree) => {
-    appendFileSync(logPath, `${fp} ${tree} ${branch}\n`)
-    keepTree(root, 'reviewed', tree)
-  }
 
   // Did THIS turn change anything rendered? Without a usable turn snapshot (the hook was installed mid-session, or
   // the tree is gone), fall back to the branch.
@@ -259,9 +268,11 @@ function main() {
     .map(([, t]) => t)
     .reverse()
     .find((t) => treeExists(root, t))
-  const carry = treeExists(root, state.carry) ? state.carry : null
-  const from = state.reviewed ? state.askedTree : (carry ?? turnStart ?? lastTree ?? baseOf(root, config))
-  const files = changedSince(from)
+  const from = state.reviewed ? state.askedTree : (turnStart ?? lastTree ?? baseOf(root, config))
+  const carried = state.reviewed ? [] : (state.carried ?? []).filter((r) => treeExists(root, r.from) && treeExists(root, r.to))
+  const carriedDiff = carried.map((r) => gitDiff(root, '--relative', r.from, r.to, '--', ...UI)).join('\n')
+  const carriedFiles = carried.flatMap((r) => gitDiff(root, '--relative', '--name-only', r.from, r.to, '--', ...UI).split('\n').filter(Boolean))
+  const files = [...new Set([...changedSince(from), ...carriedFiles])]
   if (!files.length) process.exit(0)
 
   // Fixes the session made after this message's review. The next review reads them in full; before this turn ends,
@@ -317,11 +328,14 @@ function main() {
   }
 
   // The fingerprint names the change as it stands, so the same state is never reviewed twice.
-  const fingerprint = createHash('sha1').update(gitDiff(root, '--relative', from, now, '--', ...UI)).update(from).digest('hex').slice(0, 12)
+  const fingerprint = createHash('sha1').update(gitDiff(root, '--relative', from, now, '--', ...UI)).update(carriedDiff).update(from).digest('hex').slice(0, 12)
   if (isLogged(fingerprint)) process.exit(0)
   const review = reviewOf(fingerprint)
   if (review.reported) {
     logReview(fingerprint, now)
+    state.reviewed = true
+    state.askedTree = now
+    save()
     process.exit(0)
   }
   const pending = review.called || (input.background_tasks ?? []).some((t) => /ui-review/.test(JSON.stringify(t)))
@@ -348,7 +362,7 @@ function main() {
     keepTree(root, 'asked', now)
     save()
   }
-  const packet = existsSync(tokenOf(fingerprint)) && existsSync(join(packetOf(fingerprint), 'server.txt')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI, state)
+  const packet = existsSync(tokenOf(fingerprint)) && existsSync(join(packetOf(fingerprint), 'server.txt')) ? { dir: packetOf(fingerprint), serving: /: yes/.test(readFileSync(join(packetOf(fingerprint), 'server.txt'), 'utf8')) } : writePacket(fingerprint, from, now, UI, state, carriedDiff)
   const shoot = config.screenshot
     ? `your screenshot command from .claude/design-harness.local.json (${config.screenshot})`
     : `\`node ${HARNESS}/bin/shoot.mjs /<route>\``

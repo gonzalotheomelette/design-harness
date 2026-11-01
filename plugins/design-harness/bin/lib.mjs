@@ -211,6 +211,17 @@ export function changedFiles(root, base, globs) {
     .filter(Boolean)
 }
 
+// Files under `globs` that gained at least one line between `base` and the working state. A file that only lost
+// lines (a cut, the commonest fix) has nothing for a check to read, and is not a file the check failed to read.
+export function filesWithAdditions(root, base, globs) {
+  return gitDiff(root, '--relative', '--numstat', base, snapshot(root, globs), '--', ...pathspec(globs))
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => l.split('\t'))
+    .filter(([added]) => added === '-' || Number(added) > 0)
+    .map(([, , file]) => file)
+}
+
 // The `--base=` a check was given, or the branch's base. It must name a commit or tree: passed on unchecked,
 // `--base=--output=<file>` reached git as an option, truncated the file and made the check pass on a change it never
 // read. Anything else ends the check with exit 2, which no caller reads as clean.

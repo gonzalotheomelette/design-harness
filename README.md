@@ -25,8 +25,8 @@ makes after the review are read by the next one.
 - **The best public design skills**, pinned to a commit that was read and checked: Anthropic's frontend-design,
   Impeccable, Google Chrome's modern-web-guidance and Emil Kowalski's design-engineering skills.
 
-How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, scored blind
-over three runs: it is a good copy reviewer and a weak visual one. On the client prototype's corrections, mostly wordy copy, it
+How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, measured on
+0.7.0 (later versions changed the reviewer's prompt and have not been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On the client prototype's corrections, mostly wordy copy, it
 caught 11 to 14 of 32 outright and 8 or 9 more in part, with one finding in eight not worth the time. On a
 held-out project whose corrections were mostly visual and product calls, with no dev server for pictures, it caught
 2 of 19 outright. The pictures the shipped flow adds are not measured yet.

@@ -7,12 +7,12 @@ The website's answer keys and reports are here. The client prototype's quote a c
 ## Steps
 
 1. Clone each project somewhere disposable (`git clone --shared` leaves the original untouched) and check out each
-   case's introducing commit in its own worktree. For a the client prototype case, symlink the project's `node_modules` in (the copy
-   check parses with its TypeScript) and give the worktree `.claude/design-harness.json` with `{"allowPalette": true}`,
-   the setting that project would have.
+   case's introducing commit in its own worktree. For a the client prototype case, give the worktree `.claude/design-harness.json`
+   with `{"allowPalette": true}`, the setting that project would have. Nothing needs installing: the checks parse with
+   the TypeScript that ships with the harness.
 2. Write each case's answer key: the fix commit's message and what it removed and added
    (`scripts/find-introducing-commit.py <fix>` blames the removed lines to find the introducing commit).
-3. Write each case's packet, as the hook does: `node scripts/make-packet.mjs <worktree> <packet dir> [src]`.
+3. Write each case's packet, as the hook does: `node scripts/make-packet.mjs <worktree> <packet dir>`.
 4. Run the reviewer three times per case, each a fresh Sonnet agent with this prompt:
 
    > You are acting as the `ui-review` agent in a benchmark. Read your instructions in full first:

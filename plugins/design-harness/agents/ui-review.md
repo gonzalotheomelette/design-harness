@@ -47,6 +47,9 @@ working copy's `.claude/design-harness.json`, which the change may have edited),
 surface's requirement in `docs/product/` (what it must do, its data, its states, its acts). Do not read them end to
 end when they are long: read the sections the change touches. Rendered files outside the change are context only.
 
+When the packet has `carried.diff`, it is work the previous message changed and nobody reviewed: review it as part
+of the change.
+
 When the packet has `docs.diff`, this change also edited the project's own documents. Those edits are part of the
 change, not settled decisions: judge the rendered change against the documents as they were before it (the `-` side
 of `docs.diff`), and report an edit that makes the change look compliant, such as a new "Chosen on purpose" entry

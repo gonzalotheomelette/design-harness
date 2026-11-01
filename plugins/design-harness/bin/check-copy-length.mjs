@@ -25,7 +25,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULTS, addedLines, baseArg, changedFiles, git, loadConfig, matchesAny, pathspec, harnessTypescript } from './lib.mjs'
+import { DEFAULTS, addedLines, baseArg, changedFiles, filesWithAdditions, git, loadConfig, matchesAny, pathspec, harnessTypescript } from './lib.mjs'
 
 const root = process.cwd()
 const config = loadConfig(root) ?? DEFAULTS
@@ -48,6 +48,8 @@ const LIMITS = {
   label: 5,
   placeholder: 6,
   description: 22,
+  // Words in any other element (a <div>, a <span>): explainer copy wrapped in a plain element was never measured.
+  text: 22,
   ...(config.copyLimits ?? {}),
 }
 
@@ -177,6 +179,12 @@ function collectMarkup(file) {
     if (/[A-Za-z]/.test(words)) found.push({ file, line, end, kind, text, words: wordsOf(text) })
     else if (exprs.length) found.push({ file, line, end, kind, opaque: exprs[0].replace(/^\{+|\}+$/g, '').trim() })
   }
+  // Words directly inside any other element with no child tags, the markup form of the JSX rule above.
+  for (const m of src.matchAll(/<([a-z][\w-]*)\b[^>]*>([^<{]*[A-Za-z][^<{]*)<\/\1>/g)) {
+    if (HTML_KIND[m[1]]) continue
+    const text = m[2].replace(/&[a-z]+;|&#\d+;/g, ' ').replace(/\s+/g, ' ').trim()
+    if (wordsOf(text) > 3) found.push({ file, line: lineAt(m.index), end: lineAt(m.index + m[0].length), kind: 'text', text, words: wordsOf(text) })
+  }
   for (const m of src.matchAll(/\s(title|placeholder|aria-label|alt)="([^"]{1,400})"/g)) {
     const kind = m[1] === 'placeholder' ? 'placeholder' : m[1] === 'title' ? 'title' : null
     if (kind && /[A-Za-z]/.test(m[2])) found.push({ file, line: lineAt(m.index), end: lineAt(m.index), kind, text: m[2], words: wordsOf(m[2]) })
@@ -246,6 +254,12 @@ function collect(file) {
         if (holder.children.length) add(kind, node, () => inline(holder))
       }
     }
+    // Any other element's own words, inline children left to their sentence: an explainer in a plain <div> or
+    // <span> is the commonest correction, and it fell outside every kind.
+    if (ts.isJsxElement(node) && !measured.has(node) && !TAG_KIND[tagName(node.openingElement)]) {
+      const own = node.children.filter((c) => ts.isJsxText(c) && c.text.trim())
+      if (own.length) add('text', node, () => own.map((c) => c.text).join(' '))
+    }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       for (const attr of node.attributes.properties) {
         if (!ts.isJsxAttribute(attr) || !attr.initializer) continue
@@ -271,12 +285,15 @@ let scope = null
 let notClean = false
 let files
 if (ALL) {
-  files = git(root, 'ls-files', '--', ...pathspec(COPY_FILES)).split('\n').filter(Boolean)
+  files = git(root, 'ls-files', '--', ...pathspec(config.ui)).split('\n').filter((f) => matchesAny(f, COPY_FILES))
 } else {
   const base = baseArg(config, root)
-  scope = addedLines(root, base, COPY_FILES)
+  // The rendered files the hook reviews (`ui`), of the kinds this check reads: reading its own wider list flagged
+  // files outside the change the reviewer was shown.
+  const all = addedLines(root, base, config.ui)
+  scope = new Map([...all].filter(([f]) => matchesAny(f, COPY_FILES)))
   files = [...scope.keys()]
-  const listed = changedFiles(root, base, COPY_FILES).filter((f) => !matchesAny(f, EXCLUDE))
+  const listed = filesWithAdditions(root, base, config.ui).filter((f) => matchesAny(f, COPY_FILES) && !matchesAny(f, EXCLUDE))
   if (listed.length && !files.length) {
     console.log(`copy-length: NOT A CLEAN PASS. git lists ${listed.length} changed file(s) but none could be read; check their copy by hand.`)
     process.exit(2)
@@ -329,9 +346,11 @@ if (unmeasured.length) {
   console.log(`copy-length: ${unmeasured.length} slot(s) hold copy it could not read (a prop, a call, an import); read them by hand:`)
   for (const i of unmeasured.slice(0, 15)) console.log(`  ${i.file}:${i.line}  ${i.kind} holds {${i.opaque}}`)
 }
-if (!items.length && files.length) {
-  console.log(`copy-length: NOT A CLEAN PASS. ${files.length} file(s) changed and no copy could be measured in them; read their strings by hand.`)
-  process.exit(2)
+// Added lines with no copy in them (a logic change, a class name) are not a failure to read; the population line
+// above says how much was measured.
+if (!items.length && !unmeasured.length && !notClean) {
+  console.log(`copy-length: no copy in the added lines of ${files.length} file(s)`)
+  process.exit(0)
 }
 const over = items.filter((i) => i.words > LIMITS[i.kind])
 if (!over.length) {

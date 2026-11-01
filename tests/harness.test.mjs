@@ -182,7 +182,10 @@ test('after a review reports, later reviews start from what it reviewed, even if
   assert.equal(end, null, 'fixes after this message\'s review end the turn quietly')
   hook(dir, 'UserPromptSubmit')
   write(dir, { 'src/b.tsx': 'next turn\n' })
-  assert.equal(baseIn(dir, fpOf(askFor(dir))), askedTree)
+  const fp2 = fpOf(askFor(dir))
+  // The fixes after the review reach the next review as their own diff, and its range starts at its own turn.
+  assert.match(readFileSync(join(packetDir(dir, fp2), 'carried.diff'), 'utf8'), /\+two, fixed after the review/)
+  assert.notEqual(baseIn(dir, fp2), askedTree)
 })
 
 test('a snapshot git has pruned is skipped instead of failing every turn, and snapshots are kept by a ref', () => {
@@ -342,7 +345,7 @@ test('copy one element down is measured as the element that renders it, and link
   assert.match(r.stdout, /a\.tsx:3 {2}button is 7 words/, r.stdout)
   assert.match(r.stdout, /a\.tsx:4 {2}button is 7 words/, r.stdout)
   assert.doesNotMatch(r.stdout, /a\.tsx:5/, `a five-word link in a sentence is not a long button: ${r.stdout}`)
-  assert.match(r.stdout, /4 strings .* measured/, r.stdout) // the <p> around the link counts too
+  assert.match(r.stdout, /5 strings .* measured/, r.stdout) // the <p> around the link, and the <div>'s own words
 })
 
 // Round four: the reviewer has no shell, and the hook prepares what it reads.
@@ -596,7 +599,7 @@ test('work a message left unreviewed is carried into the next one', () => {
   assert.ok(hook(dir, 'Stop').out?.systemMessage, 'the cap lets it through unreviewed')
   hook(dir, 'UserPromptSubmit')
   write(dir, { 'src/b.tsx': 'b1\n' })
-  assert.match(askFor(dir), /2: src\/a\.tsx, src\/b\.tsx/)
+  assert.match(askFor(dir), /2: (src\/a\.tsx, src\/b\.tsx|src\/b\.tsx, src\/a\.tsx)/)
 })
 
 test('a message queued before the last turn stopped keeps that turn\'s edits in range', () => {
@@ -605,7 +608,7 @@ test('a message queued before the last turn stopped keeps that turn\'s edits in 
   write(dir, { 'src/a.tsx': 'a1\n' })
   hook(dir, 'UserPromptSubmit') // queued: fires before any stop
   write(dir, { 'src/b.tsx': 'b1\n' })
-  assert.match(askFor(dir), /2: src\/a\.tsx, src\/b\.tsx/)
+  assert.match(askFor(dir), /2: (src\/a\.tsx, src\/b\.tsx|src\/b\.tsx, src\/a\.tsx)/)
 })
 
 test('plain HTML copy is measured, and drift reads the universal selector and class lists built with push', () => {
@@ -815,4 +818,59 @@ test('one blank page among several makes the accessibility run not clean', () =>
   const r = check(dir, 'check-a11y.mjs', '/one', '/two')
   assert.equal(r.status, 2, r.stdout + r.stderr)
   assert.match(r.stdout, /1 run\(s\) passed no rule/)
+})
+
+// Round nine.
+
+test('a merge or branch switch after a reviewed message with fixes stays out of the next review', () => {
+  const dir = repo({ 'src/a.tsx': 'a\n', 'src/b.tsx': 'b\n', 'src/c.tsx': 'c\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'a1\n' })
+  const t = reported(dir, fpOf(askFor(dir)))
+  write(dir, { 'src/a.tsx': 'a1, fixed\n' })
+  hook(dir, 'Stop', { transcript_path: t })
+  execFileSync('git', ['add', '-A'], { cwd: dir })
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'session work'], { cwd: dir })
+  // A teammate's change merged between messages.
+  write(dir, { 'src/c.tsx': 'teammate\n' })
+  execFileSync('git', ['add', '-A'], { cwd: dir })
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'merged teammate work'], { cwd: dir })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/b.tsx': 'b1\n' })
+  const ctx = askFor(dir)
+  assert.doesNotMatch(ctx, /src\/c\.tsx/, ctx)
+  assert.match(ctx, /src\/a\.tsx/, 'the fix after the review is carried')
+  assert.match(ctx, /src\/b\.tsx/)
+})
+
+test('a review that reports after the last stop is not reviewed again', () => {
+  const dir = repo({ 'src/a.tsx': 'a\n', 'src/b.tsx': 'b\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'a1\n' })
+  const t = reported(dir, fpOf(askFor(dir)))
+  // The next message arrives before any stop could log the review.
+  hook(dir, 'UserPromptSubmit', { transcript_path: t })
+  write(dir, { 'src/b.tsx': 'b1\n' })
+  const ctx = askFor(dir)
+  assert.match(ctx, /\(1: src\/b\.tsx\)/, ctx)
+})
+
+test('a pure cut and an edit with no copy are clean, and the copy check reads only the rendered files', () => {
+  const dir = repo({ 'src/a.tsx': 'export const A = () => <main>\n  <p>Some paragraph text</p>\n</main>\n', 'lib/Old.tsx': 'x\n' }, { ui: ['src/**/*.tsx'] })
+  write(dir, { 'src/a.tsx': 'export const A = () => <main>\n</main>\n', 'lib/Old.tsx': 'export const O = () => <Button>An old file outside the rendered globs</Button>\n' })
+  const copy = check(dir, 'check-copy-length.mjs')
+  assert.equal(copy.status, 0, copy.stdout)
+  assert.doesNotMatch(copy.stdout, /Old\.tsx/)
+  assert.equal(check(dir, 'check-drift.mjs').status, 0)
+  write(dir, { 'src/a.tsx': 'export const A = () => <main className="flex">\n</main>\nconst n = 1\n' })
+  assert.equal(check(dir, 'check-copy-length.mjs').status, 0)
+})
+
+test('long text in a plain element is measured', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  write(dir, {
+    'src/a.tsx':
+      'export const A = () => (\n  <div className="p-4">\n    <div>Every change you make here is saved as a draft first, then reviewed by an administrator, then published to everyone in the account once it is approved.</div>\n    <Button>Save</Button>\n  </div>\n)\n',
+  })
+  assert.match(check(dir, 'check-copy-length.mjs').stdout, /a\.tsx:3 {2}text is 27 words/)
 })
