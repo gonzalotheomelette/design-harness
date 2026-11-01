@@ -31,12 +31,18 @@ From tokens and existing components only. The frontend-design skill's process ap
 choices, review the plan against the generated defaults, then build. On a working screen (Operate mode), the
 product must read as the best of its category before it reads as anything distinctive.
 
+Set text the way DESIGN.md's typesetting line says from the start: a measure on body text, `text-wrap: balance` on
+headings, `pretty` on paragraphs. Write copy with the `ux-copy` skill: short, in the project's voice, with the
+sibling's verbs.
+
 ## 4. Look at it
 
 Screenshot the surface at desktop and phone width, in each colour mode the product ships, and open the images.
 Most corrections are second-order effects of your own edit, in the region beside the one you meant to change. Use
 the project's `screenshot` command when it names one, else `node <harness>/bin/shoot.mjs /<route>` from the
-project root; the browser pane can stall transitions, so a picture from it is not proof.
+project root; the browser pane can stall transitions, so a picture from it is not proof. Run
+`node <harness>/bin/check-breaks.mjs /<route>` too: a one-word last line or a stranded first word changes with the
+width, and three widths catch what one picture misses.
 
 ## 5. Let the reviewer read it
 

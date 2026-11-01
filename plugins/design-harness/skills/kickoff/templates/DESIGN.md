@@ -76,6 +76,11 @@ chosen for the dark scene rather than inverted, and checked for contrast like th
 
 {The families and why; the scale; where each step is used.}
 
+{Typesetting: a measure for body text (about 60 to 75 characters, set with max-width in ch); `text-wrap: balance` on
+headings and short centred text, `text-wrap: pretty` on paragraphs and list items; a non-breaking space after a short
+word that should not end a line ("the", "to", a number before its unit) where the browser still breaks there. The
+break check (`check-breaks.mjs`) finds what is left.}
+
 ## Layout
 
 {Grid, gutters, measure, density per surface mode.}

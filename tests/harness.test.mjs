@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, r
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { globToRegExp, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
+import { globToRegExp, lineFlags, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
 
 const HARNESS = join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins', 'design-harness')
 const HOOK = join(HARNESS, 'hooks', 'review-before-show.mjs')
@@ -893,4 +893,33 @@ test('screenshots are the screen a visitor sees, scrolled a screen at a time, fr
   assert.match(r.stdout, /more slice\(s\) below/)
   const at = check(dir, 'shoot.mjs', '/long', '--at=#pricing', '--tiles=1')
   assert.match(at.stdout, /scrolled to 2920px/, at.stdout)
+})
+
+// Line breaks.
+
+test('the break rules flag a one-word last line, a line ending on a leaning word, and a stranded sentence start', () => {
+  assert.deepEqual(lineFlags(['Before we get', 'started.']), ['last line is one word: "started."'])
+  assert.match(lineFlags(['We help teams prove it with the', 'real users.']).join(), /a line ends on "the"/)
+  assert.match(lineFlags(['Prove it with real users. Then', 'we build it in code.']).join(), /a sentence starts on the last word of a line: "users\. Then"/)
+  assert.deepEqual(lineFlags(['An even, balanced', 'heading here']), [])
+  assert.deepEqual(lineFlags(['One line only']), [])
+  assert.deepEqual(lineFlags(['Seats left today', '5']), [], 'a one-character last line is a number or mark, not a word')
+})
+
+test('the break check reads each block at three widths and names what reads badly', () => {
+  const dir = repo({ 'src/a.tsx': 'x' })
+  write(dir, {
+    'node_modules/puppeteer/package.json': '{"name":"puppeteer","main":"index.js"}',
+    'node_modules/puppeteer/index.js': `module.exports = { launch: async () => ({
+      newPage: async () => { let w = 0; return {
+        setViewport: async (v) => { w = v.width }, emulateMediaFeatures: async () => {}, goto: async () => ({ status: () => 200 }),
+        evaluate: async () => w === 390 ? [{ tag: 'h2', lines: ['Before we get', 'started.'] }, { tag: 'p', lines: ['Fine lines that', 'stay even here.'] }] : [{ tag: 'h2', lines: ['Before we get started.'] }],
+        close: async () => {} } },
+      close: async () => {} }) }`,
+  })
+  const r = check(dir, 'check-breaks.mjs', '/pricing')
+  assert.equal(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stdout, /\/pricing \[phone\] h2 "Before we get \/ started\.": last line is one word/)
+  assert.doesNotMatch(r.stdout, /\[desktop\]/)
+  assert.match(r.stdout, /4 text block\(s\) read across 1 page\(s\) at 3 widths, 1 bad break\(s\)/)
 })

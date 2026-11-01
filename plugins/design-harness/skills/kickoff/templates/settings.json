@@ -9,14 +9,13 @@
       "source": {
         "source": "github",
         "repo": "gonzalotheomelette/design-harness",
-        "ref": "v0.12.1"
+        "ref": "v0.13.0"
       }
     }
   },
   "enabledPlugins": {
     "design-harness@omelette": true,
     "frontend-design@omelette": true,
-    "impeccable@omelette": true,
     "modern-web-guidance@omelette": true,
     "emil-design-engineering@omelette": true
   }

@@ -11,7 +11,7 @@
     {
       "name": "design-harness",
       "source": "./plugins/design-harness",
-      "version": "0.12.1",
+      "version": "0.13.0",
       "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift and accessibility checks, a mood-board kickoff, and a learn skill that turns corrections into rules.",
       "category": "design"
     },
@@ -34,7 +34,7 @@
         "path": "plugin",
         "sha": "4f956490f0056ae1ff5ea80372cf56e83c001d3c"
       },
-      "description": "Paul Bakaus's Impeccable: critique, audit, polish, distill and 20 more commands, with surface modes and a craft floor. Note: its detector downloads a binary on first use.",
+      "description": "Optional, off by default: Paul Bakaus's Impeccable, critique, audit, polish, distill and 20 more commands. Its useful rules are already distilled in the harness's AI-look register. Note: its detector downloads a binary on first use.",
       "category": "design"
     },
     {

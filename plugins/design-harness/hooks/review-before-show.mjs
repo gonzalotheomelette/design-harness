@@ -381,7 +381,8 @@ function main() {
             : '') +
           (packet.serving
             ? `1. The dev server serves this checkout, so take pictures of the pages this change renders with ${shoot}, and ` +
-              `run \`node ${HARNESS}/bin/check-a11y.mjs /<route>\` on them, writing both outputs to ${packet.dir}/browser.txt. `
+              `run \`node ${HARNESS}/bin/check-a11y.mjs /<route>\` and \`node ${HARNESS}/bin/check-breaks.mjs /<route>\` on them, writing ` +
+              `all three outputs to ${packet.dir}/browser.txt. `
             : '') +
           `${packet.serving ? '2' : '1'}. Run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) and ` +
           `wait for its report. Its prompt: "packet: ${packet.dir}", "fingerprint: ${fingerprint}", and one sentence on ` +

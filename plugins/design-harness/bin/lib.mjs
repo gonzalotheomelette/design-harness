@@ -390,6 +390,25 @@ export async function openBrowser(root, config) {
   return null
 }
 
+// What reads badly in a text block's lines, as the browser broke them: a last line of one word, a line ending on a
+// word that leans on the next ("the", "to"), and a sentence whose first word is stranded at the end of a line. Each
+// is a break a reader trips on, and each changes with the width, which is why the check measures several.
+export const LEAN_WORDS = ['a', 'an', 'the', 'to', 'of', 'and', 'or', 'but', 'we', 'our', 'your', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'as', 'is', 'it', 'its', 'i', 'my', 'no', 'not']
+export function lineFlags(lines, lean = LEAN_WORDS) {
+  const flags = []
+  if (lines.length < 2) return flags
+  const word = (w) => w.replace(/^[\W_]+|[\W_]+$/gu, '').toLowerCase()
+  const last = lines.at(-1).trim().split(/\s+/)
+  if (last.length === 1 && word(last[0]).length > 1) flags.push(`last line is one word: "${last[0]}"`)
+  for (const line of lines.slice(0, -1)) {
+    const words = line.trim().split(/\s+/)
+    const end = words.at(-1)
+    if (/[.!?:;]["”’)\]]?$/.test(words.at(-2) ?? '') && words.length > 1) flags.push(`a sentence starts on the last word of a line: "${words.slice(-2).join(' ')}"`)
+    else if (lean.includes(word(end))) flags.push(`a line ends on "${end}": "${line.trim().slice(-40)}"`)
+  }
+  return flags
+}
+
 // `**/` is any depth, `**` anything, `*` anything within one folder. Placeholders first: the single-star step used to
 // rewrite the `.*` the double-star step had just written, so `**/theme.css` matched one folder deep and no deeper,
 // and a theme file at src/styles/theme.css was flagged as drift. tests/harness.test.mjs holds the cases.

@@ -23,13 +23,18 @@ makes after the review are read by the next one.
 - **Rules that grow from corrections.** `/design-harness:learn` turns each correction into a row in the project's
   `docs/ui-consistency.md`, so the same slip is caught automatically next time.
 - **The best public design skills**, pinned to a commit that was read and checked: Anthropic's frontend-design,
-  Impeccable, Google Chrome's modern-web-guidance and Emil Kowalski's design-engineering skills.
+  Google Chrome's modern-web-guidance and Emil Kowalski's design-engineering skills, on by default. Paul Bakaus's
+  Impeccable is listed but off by default: it covers the same ground as frontend-design and the harness's AI-look
+  register (which distils its useful rules), its opinions pull hardest against a project's own taste, and it downloads
+  a program on first use. A project that wants its audit commands installs it and enables it in its settings.
 
 How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, measured on
 0.7.0 (later versions changed the reviewer's prompt and have not been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On the client prototype's corrections, mostly wordy copy, it
 caught 11 to 14 of 32 outright and 8 or 9 more in part, with one finding in eight not worth the time. On a
 held-out project whose corrections were mostly visual and product calls, with no dev server for pictures, it caught
-2 of 19 outright. The pictures the shipped flow adds are not measured yet.
+2 of 19 outright. Rerun on 0.12.1 with the dev server up (two judges, 95% agreement), the screenshots did not
+change that: the visual corrections were missed with and without them. What did catch one class, line breaks, was a
+measurement, which is now `check-breaks.mjs`.
 
 - **Product work in the same place.** A requirement per surface (`docs/product/`), a decision log and an open
   questions register sit beside the design files. The reviewer checks each surface against its requirement, so a
@@ -59,10 +64,6 @@ held-out project whose corrections were mostly visual and product calls, with no
 
    ```bash
    claude plugin install frontend-design@omelette --scope project
-   ```
-
-   ```bash
-   claude plugin install impeccable@omelette --scope project
    ```
 
    ```bash
@@ -108,10 +109,11 @@ plugins/design-harness/
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
   skills/learn/                     a correction becomes a rule
+  skills/ux-copy/                   interface copy in the project's voice, short, with the sibling's verbs
   skills/feedback/                  client notes in (Google Docs, Claude Docs, Granola), sorted, built, answered
   skills/web-design-guidelines/     Vercel's wider review, for PR time
   reference/ai-look.md              the devices that read as generated
-  bin/                              check-copy-length, check-drift, check-a11y, shoot, server-of (run from a
+  bin/                              check-copy-length, check-drift, check-a11y, check-breaks, shoot, server-of (run from a
                                     project root). Copy and drift parse with the TypeScript in bin/vendor, never
                                     the project's; check-a11y and shoot, which the session runs, use the project's
                                     own Playwright or Puppeteer
@@ -139,7 +141,7 @@ rules or its model change.
   project's own scripts would.
 - Supply chain below the top level: external plugins are pinned by commit and the DESIGN.md linter by version, but
   the harness itself only by tag (Claude Code's marketplace source takes a branch or tag, not a commit), the linter's
-  own dependencies float, and Impeccable downloads a binary on first use.
+  own dependencies float, and Impeccable (optional) downloads a binary on first use.
 - Copy behind a translation call or a prop: the copy check lists those slots for the reviewer instead of measuring
   them.
 - Copy in markup other than JSX, HTML, Vue, Svelte and Astro (Handlebars, ERB, Markdown): the check names those

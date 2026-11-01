@@ -20,6 +20,37 @@ scores, and `bench/README.md` the steps. A change that lowers the hit rate or ra
    fix), PARTIAL (same element, other reason; or right reason, neighbouring element), MISS. Per report: total
    findings, and how many are not worth a designer's time.
 
+## 0.12.1 with screenshots, on the held-out website (2026-11-01)
+
+The question: do pictures catch the visual corrections the code-only reviews missed? The six website cases were run
+the way the harness ships, three times each: each case's site built and served, a packet per run, and a headless
+Claude Code session with the plugin loaded that took screenshots (scrolled screen by screen, light and dark, desktop
+and phone) and an accessibility run, then called the real `design-harness:ui-review` agent. The corrections were
+listed from the answer keys alone, before any report was read (`bench/website/corrections.json`, 21 of them, 7 that
+only show on the rendered page). Two Opus judges then scored all six reports per case independently, the three new
+runs beside the three 0.7.0 code-only runs, shuffled. They agreed on 120 of 126 marks (95%, Cohen's kappa 0.91).
+
+| Per run, of 21 corrections | Hits | Partial | Miss | Findings per review | Not worth the time |
+|---|---|---|---|---|---|
+| 0.12.1, with screenshots | 1.3 | 6.3 | 13.3 | 6.0 | 30 to 37% |
+| 0.7.0, code only | 1.3 | 6.0 | 13.7 | 10.1 | 30 to 33% |
+| The 7 visual-only corrections, 0.12.1 | 0 | 0.7 | 7.3 | | |
+| The 7 visual-only corrections, 0.7.0 | 0 | 2.0 | 6.0 | | |
+
+What it says: **the screenshots did not catch the visual corrections.** Hits are the same with and without them, and
+on the seven corrections that only show on the page (line breaks, a 28px gap out of line, two animations stacked on
+phones, a near-black that should match its neighbour), neither version found one, and the code-only runs came closer.
+The newer reviewer is more concise (6 findings per review against 10) at the same share of noise. Pictures cost 1.5 to
+4 minutes a review on this project.
+
+What does catch one class of them is a measurement, not a picture: the line-break check added after this run
+(`check-breaks.mjs`), run on case W6's pages, flagged 29 bad breaks, among them the exact ones that case's fix
+corrected ("Leave with the / part that matters.", "For product teams with / more ideas than time to / build them").
+The others (spacing out of line with its siblings, a colour that should match, how many animations a phone shows) are
+the next candidates for the same treatment. `bench/scores-v0.12.1/` holds both judges' scores and the blind key, and
+`python3 bench/scripts/tally-two-judges.py bench/scores-v0.12.1` reproduces this table;
+`bench/scripts/run-website.sh` repeats the run.
+
 ## Results for 0.7.0: three runs per case, two projects
 
 13 cases: the 7 the client prototype cases below and 6 from the website, chosen by the same rule (a commit that removed copy or a
