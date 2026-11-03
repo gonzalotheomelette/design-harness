@@ -1,6 +1,6 @@
 {
   "name": "design-harness",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Review before show for UI work: a Stop hook holds any turn that changed rendered files until a fresh-context reviewer has compared the change with its sibling surfaces, the project's settled rules and the AI-look register, and checked copy length, token drift and accessibility. Plus a mood-board kickoff and a learn skill that turns the designer's corrections into rules.",
   "author": {
     "name": "Gonzalo Hernandez",
