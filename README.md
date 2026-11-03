@@ -30,7 +30,7 @@ makes after the review are read by the next one.
   a program on first use. A project that wants its audit commands installs it and enables it in its settings.
 
 How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, measured on
-0.7.0 (later versions changed the reviewer's prompt and have not been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On a client prototype's corrections, mostly wordy copy, it
+0.7.0 with Sonnet as the reviewer (later versions changed its prompt, and since 0.16.0 it runs on the latest Opus; neither has been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On a client prototype's corrections, mostly wordy copy, it
 caught 11 to 14 of 32 outright and 8 or 9 more in part, with one finding in eight not worth the time. On a
 held-out project whose corrections were mostly visual and product calls, with no dev server for pictures, it caught
 2 of 19 outright. Rerun on 0.12.1 with the dev server up (two judges, 95% agreement), the screenshots did not
@@ -113,7 +113,7 @@ your-project/
 .claude-plugin/marketplace.json     the "omelette" marketplace: design-harness plus the pinned external plugins
 plugins/design-harness/
   hooks/                            review-before-show (Stop + UserPromptSubmit): the turn gate and the review packet
-  agents/ui-review.md               the reviewer: Sonnet, Read, Grep and Glob, no shell
+  agents/ui-review.md               the reviewer: the latest Opus, Read, Grep and Glob, no shell
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
   skills/learn/                     a correction becomes a rule

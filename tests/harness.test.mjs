@@ -924,6 +924,13 @@ test('the break check reads each block at three widths and names what reads badl
   assert.match(r.stdout, /4 text block\(s\) read across 1 page\(s\) at 3 widths, 1 bad break\(s\)/)
 })
 
+test('the reviewer runs on the latest Opus, and the benchmark records which Opus it last covered', () => {
+  const agent = readFileSync(join(HARNESS, 'agents', 'ui-review.md'), 'utf8')
+  assert.match(agent, /^model: opus$/m, 'the reviewer follows the latest Opus through the opus alias, not a pinned model')
+  const benched = readFileSync(join(HARNESS, '..', '..', 'bench', 'opus-benchmarked.txt'), 'utf8').trim()
+  assert.match(benched, /^(none|claude-opus-[a-z0-9-]+)$/, 'the weekly new-opus check compares against this file')
+})
+
 test('with the dev server up, the checks always run and screenshots only when the project opts in', async () => {
   const ask = async (screenshots) => {
     const port = 4400 + Math.floor(Math.random() * 500)

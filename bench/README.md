@@ -13,7 +13,7 @@ The website's answer keys and reports are here. The client prototype's keys quot
 2. Write each case's answer key: the fix commit's message and what it removed and added
    (`scripts/find-introducing-commit.py <fix>` blames the removed lines to find the introducing commit).
 3. Write each case's packet, as the hook does: `node scripts/make-packet.mjs <worktree> <packet dir>`.
-4. Run the reviewer three times per case, each a fresh Sonnet agent with this prompt:
+4. Run the reviewer three times per case, each a fresh agent on the reviewer's model (`opus`, the latest Opus, since 0.16.0; the published numbers are Sonnet's) with this prompt:
 
    > You are acting as the `ui-review` agent in a benchmark. Read your instructions in full first:
    > `<harness>/agents/ui-review.md`, and follow them, with these adjustments: the project is checked out at
