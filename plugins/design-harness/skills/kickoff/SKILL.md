@@ -143,8 +143,8 @@ the person approves; the tokens are not approved until they have seen them used.
 
 ## 8. Switch on the harness for this project
 
-Claude Code protects the `.claude/` folder, so writing the two files there asks the person once; that is expected,
-and a headless run cannot write them at all (the 2026-10-31 dry run stopped exactly there). Say what the two files
+Claude Code protects the `.claude/` folder, so writing the three files there asks the person once; that is expected,
+and a headless run cannot write them at all (the 2026-10-31 dry run stopped exactly there). Say what the three files
 do when asking.
 
 Copy from `templates/`:
@@ -161,11 +161,13 @@ where layout is the work. `allowPalette` stays `false` unless the project's toke
   `.claude/design-harness.local.json` as `screenshot` (a command, `{route}` where the path goes) or `browserPath`, and
   that file goes in `.gitignore`. The harness reads these two only from that file and only while git does not track
   it, so a repository someone clones can never hand the session a command to run.
-- `settings.json` merged into `.claude/settings.json` (registers the omelette marketplace, enables the plugins, and allows the pinned DESIGN.md linter).
-  Its `ref` pins the harness to the release tag current at kickoff, so a later change to the harness cannot change
-  this project's behaviour until someone moves the tag on purpose. Before handing a repo to a client's developers,
-  move the plugin settings to `.claude/settings.local.json` (or remove them): the marketplace is private, and the
-  hook would otherwise ask them to install something they cannot reach.
+- `settings.json` merged into `.claude/settings.json`, committed: it allows the pinned DESIGN.md linter and nothing
+  else, so it is safe for anyone who clones the repo.
+- `settings.local.json` merged into `.claude/settings.local.json`, with `.claude/settings.local.json` added to
+  `.gitignore` in the same step: it registers the omelette marketplace and enables the plugins on this machine only.
+  The marketplace is private, so in the committed settings it would ask a client's developers to install something
+  they cannot reach. Its `ref` pins the harness to the release tag current at kickoff, so a later change to the
+  harness cannot change this project's behaviour until the tag is moved on purpose.
 - `ui-consistency.md` to `docs/ui-consistency.md`. It starts nearly empty on purpose: it fills with the person's
   corrections through `/design-harness:learn`.
 - `decision-log.md` and `open-questions.md` to `docs/`, and `requirement.md` as the pattern for
@@ -177,7 +179,7 @@ where layout is the work. `allowPalette` stays `false` unless the project's toke
 
 The copy and drift checks need nothing installed: they parse with the TypeScript that ships with the harness. If the
 person has not installed the external plugins yet (the README installs them before the kickoff), tell them each needs
-one install per machine: `claude plugin install <name>@omelette --scope project` for each plugin the settings list.
+one install per machine: `claude plugin install <name>@omelette --scope local` for each plugin the local settings list.
 
 ## 9. Show
 
