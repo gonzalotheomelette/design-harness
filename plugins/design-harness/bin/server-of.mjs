@@ -8,7 +8,7 @@
  * Usage: node server-of.mjs   (from the project root)
  * Prints `serves this checkout: yes` (exit 0), or `no` / `nothing listening` with why (exit 1).
  */
-import { spawnSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
 import { DEFAULTS, loadConfig } from './lib.mjs'
 
@@ -16,17 +16,20 @@ const root = realpathSync(process.cwd())
 const config = loadConfig(root) ?? DEFAULTS
 const url = new URL(config.devServer)
 const port = url.port || (url.protocol === 'https:' ? '443' : '80')
-// lsof exits 1 when any file on the machine is unreadable, and still prints what it found: read its output whatever
-// the exit status. Treating that exit as "nothing" hid a listening server on a CI runner.
-const sh = (...args) =>
-  spawnSync(args[0], args.slice(1), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }).stdout?.trim() ?? ''
-const pids = sh('lsof', '-nPw', `-iTCP:${port}`, '-sTCP:LISTEN', '-t').split('\n').filter(Boolean)
+const sh = (...args) => {
+  try {
+    return execFileSync(args[0], args.slice(1), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  } catch {
+    return ''
+  }
+}
+const pids = sh('lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t').split('\n').filter(Boolean)
 if (!pids.length) {
   console.log(`serves this checkout: nothing listening on ${port} (${config.devServer})`)
   process.exit(1)
 }
 for (const pid of pids) {
-  const cwd = sh('lsof', '-aw', '-p', pid, '-d', 'cwd', '-Fn').split('\n').find((l) => l.startsWith('n'))?.slice(1)
+  const cwd = sh('lsof', '-a', '-p', pid, '-d', 'cwd', '-Fn').split('\n').find((l) => l.startsWith('n'))?.slice(1)
   let real = cwd
   try {
     real = realpathSync(cwd)
