@@ -943,7 +943,12 @@ test('with the dev server up, the checks always run and screenshots only when th
       }
       if (!up.includes(': yes')) {
         const http = await fetch(`http://127.0.0.1:${port}/`).then((r) => `answers ${r.status}`, (e) => `no answer (${e.cause?.code ?? e.message})`)
-        assert.fail(`the test server never came up: ${up.trim()}; python ${exit}, ${http}; stderr: ${stderr.trim() || 'none'}`)
+        const raw = (...a) => {
+          const t = Date.now()
+          const r = spawnSync('lsof', a, { encoding: 'utf8', timeout: 20000 })
+          return `lsof ${a.join(' ')} -> status ${r.status} signal ${r.signal} in ${Date.now() - t}ms, out ${JSON.stringify(r.stdout?.slice(0, 400))}, err ${JSON.stringify(r.stderr?.slice(0, 400))}`
+        }
+        assert.fail(`the test server never came up: ${up.trim()}; python ${exit} (pid ${server.pid}), ${http}; stderr: ${stderr.trim() || 'none'}\n${raw('-nPw', `-iTCP:${port}`, '-sTCP:LISTEN', '-t')}\n${raw('-nP', '-a', '-p', String(server.pid), '-i')}`)
       }
       hook(dir, 'UserPromptSubmit')
       write(dir, { 'src/a.tsx': 'y\n' })
