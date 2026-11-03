@@ -1,0 +1,58 @@
+# Once a week, asks Anthropic's models API for the newest Opus. The reviewer runs on the `opus` alias, so a new Opus
+# starts reviewing as soon as Claude Code picks it up, with no benchmark behind it. When the newest Opus is not the
+# one in bench/opus-benchmarked.txt, this opens one issue asking for the benchmark to be rerun on it.
+name: new-opus
+
+on:
+  schedule:
+    - cron: '0 13 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::Add an ANTHROPIC_API_KEY repository secret so this check can read the model list."
+            exit 1
+          fi
+          models=$(curl -fsS "https://api.anthropic.com/v1/models?limit=1000" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2026-10-21")
+          id=$(jq -r '[.data[] | select(.id | startswith("claude-opus-"))] | sort_by(.created_at) | last | .id' <<<"$models")
+          name=$(jq -r --arg id "$id" '.data[] | select(.id == $id) | .display_name' <<<"$models")
+          if [ -z "$id" ] || [ "$id" = "null" ]; then
+            echo "::error::The models API listed no Opus model."
+            exit 1
+          fi
+          benched=$(tr -d '[:space:]' < bench/opus-benchmarked.txt)
+          echo "Newest Opus: $id ($name). Benchmarked: $benched."
+          if [ "$id" = "$benched" ]; then
+            exit 0
+          fi
+          title="Benchmark the reviewer on $name"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json title --jq "[.[] | select(.title == \"$title\")] | length")
+          if [ "$open" != "0" ]; then
+            echo "An issue is already open: $title"
+            exit 0
+          fi
+          gh issue create --title "$title" --body "$(cat <<EOF
+          $name (\`$id\`) is the newest Opus. The reviewer runs on the \`opus\` alias, so it reviews with this model as soon as Claude Code picks it up. The benchmark has not been run on it: the last Opus it covered is \`$benched\`.
+
+          1. Rerun the benchmark as \`bench/README.md\` describes, on this model and on the one before it.
+          2. Record catch rate, findings that were not worth the time, and median minutes per review in \`docs/benchmark.md\`.
+          3. If it reviews worse, pin the reviewer back to the previous model in \`plugins/design-harness/agents/ui-review.md\` and say why.
+          4. Write \`$id\` into \`bench/opus-benchmarked.txt\`, which closes the loop for this release.
+          EOF
+          )"
