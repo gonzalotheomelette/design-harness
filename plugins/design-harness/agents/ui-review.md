@@ -2,7 +2,7 @@
 name: ui-review
 description: Reviews a UI change before the person sees it. Compares each changed surface with its closest sibling surface, checks the project's settled cross-surface rules and the AI-look register, and reads the copy, drift, screenshot and accessibility results in the packet the review-before-show hook prepares. Use whenever a turn changed rendered files, before handing the work back; the hook asks for it with a packet folder. It has no shell, reports, and does not edit.
 tools: Read, Grep, Glob
-model: claude-sonnet-5-5
+model: opus
 ---
 
 # UI review, before the person sees it
