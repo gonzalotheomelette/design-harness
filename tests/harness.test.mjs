@@ -953,3 +953,22 @@ test('with the dev server up, the checks always run and screenshots only when th
   assert.doesNotMatch(off, /shoot\.mjs/, off)
   assert.match(await ask(true), /shoot\.mjs \/<route> --at=/)
 })
+
+test('the committed settings template never registers the private marketplace or its plugins', () => {
+  const templates = join(HARNESS, 'skills', 'kickoff', 'templates')
+  const shared = JSON.parse(readFileSync(join(templates, 'settings.json'), 'utf8'))
+  assert.equal(shared.extraKnownMarketplaces, undefined, 'settings.json is committed in a client repo')
+  assert.equal(shared.enabledPlugins, undefined, 'settings.json is committed in a client repo')
+  const local = JSON.parse(readFileSync(join(templates, 'settings.local.json'), 'utf8'))
+  assert.ok(local.extraKnownMarketplaces?.omelette, 'the marketplace belongs in settings.local.json')
+  assert.ok(local.enabledPlugins?.['design-harness@omelette'], 'the plugins belong in settings.local.json')
+})
+
+test('both manifests and the kickoff template name the same release', () => {
+  const read = (...p) => JSON.parse(readFileSync(join(HARNESS, ...p), 'utf8'))
+  const plugin = read('.claude-plugin', 'plugin.json').version
+  const listed = read('..', '..', '.claude-plugin', 'marketplace.json').plugins.find((p) => p.name === 'design-harness').version
+  const ref = read('skills', 'kickoff', 'templates', 'settings.local.json').extraKnownMarketplaces.omelette.source.ref
+  assert.equal(listed, plugin, 'marketplace.json and plugin.json disagree')
+  assert.equal(ref, `v${plugin}`, 'the kickoff would pin projects to a different release than this one')
+})

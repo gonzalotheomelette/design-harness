@@ -46,7 +46,12 @@ measurement, which is now `check-breaks.mjs`.
 
 ## Start a new project
 
-1. Once per machine, add the marketplace and your personal rules:
+1. Once per machine, clone the harness, then add the marketplace and your personal rules. `install.sh` links
+   `~/.claude/CLAUDE.md` to the clone, so the clone has to stay where it is:
+
+   ```bash
+   git clone https://github.com/gonzalotheomelette/design-harness.git ~/dev/design-harness
+   ```
 
    ```bash
    claude plugin marketplace add gonzalotheomelette/design-harness
