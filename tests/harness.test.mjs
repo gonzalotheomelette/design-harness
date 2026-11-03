@@ -928,28 +928,18 @@ test('with the dev server up, the checks always run and screenshots only when th
   const ask = async (screenshots) => {
     const port = 4400 + Math.floor(Math.random() * 500)
     const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx'], devServer: `http://localhost:${port}`, ...(screenshots ? { screenshots: true } : {}) })
-    const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: dir, stdio: ['ignore', 'ignore', 'pipe'] })
-    let stderr = ''
-    let exit = 'running'
-    server.stderr.on('data', (d) => (stderr += d))
-    server.on('exit', (code, signal) => (exit = `exited ${code ?? signal}`))
+    // A Node server, not python3 -m http.server: on GitHub's macOS runners python3 sometimes took over 15 seconds to
+    // start listening, and the hook rightly saw nothing there. It runs as its own process from the checkout, as a
+    // real dev server would, because server-of matches the listening process's working directory.
+    const serve = `require('node:http').createServer((q, s) => s.end('ok')).listen(${port}, '127.0.0.1')`
+    const server = spawn(process.execPath, ['-e', serve], { cwd: dir, stdio: 'ignore' })
     try {
-      // A CI runner can take seconds to start the server; without this the hook sees nothing listening and the
-      // assertions below fail as if the hook were wrong.
       let up = ''
-      for (let i = 0; i < 150 && !up.includes(': yes'); i++) {
+      for (let i = 0; i < 50 && !up.includes(': yes'); i++) {
         up = check(dir, 'server-of.mjs').stdout
         if (!up.includes(': yes')) await new Promise((r) => setTimeout(r, 100))
       }
-      if (!up.includes(': yes')) {
-        const http = await fetch(`http://127.0.0.1:${port}/`).then((r) => `answers ${r.status}`, (e) => `no answer (${e.cause?.code ?? e.message})`)
-        const raw = (...a) => {
-          const t = Date.now()
-          const r = spawnSync('lsof', a, { encoding: 'utf8', timeout: 20000 })
-          return `lsof ${a.join(' ')} -> status ${r.status} signal ${r.signal} in ${Date.now() - t}ms, out ${JSON.stringify(r.stdout?.slice(0, 400))}, err ${JSON.stringify(r.stderr?.slice(0, 400))}`
-        }
-        assert.fail(`the test server never came up: ${up.trim()}; python ${exit} (pid ${server.pid}), ${http}; stderr: ${stderr.trim() || 'none'}\n${raw('-nPw', `-iTCP:${port}`, '-sTCP:LISTEN', '-t')}\n${raw('-nP', '-a', '-p', String(server.pid), '-i')}`)
-      }
+      assert.match(up, /: yes/, `the test server never came up: ${up}`)
       hook(dir, 'UserPromptSubmit')
       write(dir, { 'src/a.tsx': 'y\n' })
       return askFor(dir)
