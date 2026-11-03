@@ -315,7 +315,7 @@ export function projectRequire(root, name) {
 }
 
 // A browser from whatever the project already has: Playwright, else Puppeteer. A project should not have to add a
-// second browser library for the harness, and the 2026-10-31 the client prototype trial had only Puppeteer. Pages come back with
+// second browser library for the harness, and the 2026-10-31 client trial had only Puppeteer. Pages come back with
 // one shape whichever library is behind them: { goto, screenshot, axe, close }.
 const BROWSERS = [
   process.env.PUPPETEER_EXECUTABLE_PATH,

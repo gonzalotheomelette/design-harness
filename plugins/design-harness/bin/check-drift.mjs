@@ -181,7 +181,7 @@ for (const [file, lines] of scope) {
     continue
   }
   // In a stylesheet the whole line is styling. In a component only strings are (class names, inline styles): reading
-  // the code too flagged `if (!paid)` as a forced override on the first the client prototype trial.
+  // the code too flagged `if (!paid)` as a forced override on the first client trial.
   const stylesheet = /\.(css|scss|sass|less)$/.test(file)
   const strings = stylesheet ? null : ts && /\.[jt]sx?$/.test(file) ? stringsByAst(file, text.join('\n')) : stringsByLine(text)
   // A <style> block in a .vue, .svelte, .astro or .html file is a stylesheet: its lines are read whole, like a .css

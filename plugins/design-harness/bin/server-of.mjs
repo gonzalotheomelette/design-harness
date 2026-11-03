@@ -2,7 +2,7 @@
 /**
  * Is the dev server serving THIS checkout? Two sessions can share a port, and a screenshot or an accessibility
  * run against the other session's code proves nothing about this change. One command, so a reviewer whose shell
- * permissions refuse compound lines can still ask it (the first live the client prototype trial skipped its screenshots for
+ * permissions refuse compound lines can still ask it (the first live client trial skipped its screenshots for
  * exactly that reason).
  *
  * Usage: node server-of.mjs   (from the project root)

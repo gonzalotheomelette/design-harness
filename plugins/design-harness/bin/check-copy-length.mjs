@@ -7,7 +7,7 @@
  * adjective cannot fail. A number can. The limits should be read off the copy the designer has already
  * approved in this project: run `--survey` once a project has a few hundred strings and copy the 95th
  * percentile of each kind into `copyLimits` in .claude/design-harness.json. Until then the defaults below
- * apply; they were measured on the the client prototype prototype on 2026-10-31 and are a starting point, not this
+ * apply; they were measured on the first client prototype on 2026-10-31 and are a starting point, not this
  * project's taste.
  *
  * A flagged string is not automatically wrong. It is longer than nearly everything approved for that kind of
