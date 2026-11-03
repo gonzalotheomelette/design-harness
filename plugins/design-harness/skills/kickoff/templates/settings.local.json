@@ -1,0 +1,17 @@
+{
+  "extraKnownMarketplaces": {
+    "omelette": {
+      "source": {
+        "source": "github",
+        "repo": "gonzalotheomelette/design-harness",
+        "ref": "v0.15.0"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "design-harness@omelette": true,
+    "frontend-design@omelette": true,
+    "modern-web-guidance@omelette": true,
+    "emil-design-engineering@omelette": true
+  }
+}

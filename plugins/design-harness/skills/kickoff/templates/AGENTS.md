@@ -24,6 +24,8 @@ For any coding agent (Claude Code, Codex, Cursor). Claude Code reads it through 
 
 ## Checks
 
+These need the design harness, which is installed only on the designer's machine. Without it, skip them.
+
 ```bash
 node <harness>/bin/check-copy-length.mjs   # copy longer than the approved copy of its kind
 node <harness>/bin/check-drift.mjs         # raw colours, arbitrary sizes, forced overrides

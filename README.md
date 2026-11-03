@@ -30,7 +30,7 @@ makes after the review are read by the next one.
   a program on first use. A project that wants its audit commands installs it and enables it in its settings.
 
 How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, measured on
-0.7.0 (later versions changed the reviewer's prompt and have not been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On the client prototype's corrections, mostly wordy copy, it
+0.7.0 (later versions changed the reviewer's prompt and have not been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On a client prototype's corrections, mostly wordy copy, it
 caught 11 to 14 of 32 outright and 8 or 9 more in part, with one finding in eight not worth the time. On a
 held-out project whose corrections were mostly visual and product calls, with no dev server for pictures, it caught
 2 of 19 outright. Rerun on 0.12.1 with the dev server up (two judges, 95% agreement), the screenshots did not
@@ -60,23 +60,24 @@ measurement, which is now `check-breaks.mjs`.
    frontend-design's list of generated looks):
 
    ```bash
-   claude plugin install design-harness@omelette --scope project
+   claude plugin install design-harness@omelette --scope local
    ```
 
    ```bash
-   claude plugin install frontend-design@omelette --scope project
+   claude plugin install frontend-design@omelette --scope local
    ```
 
    ```bash
-   claude plugin install modern-web-guidance@omelette --scope project
+   claude plugin install modern-web-guidance@omelette --scope local
    ```
 
    ```bash
-   claude plugin install emil-design-engineering@omelette --scope project
+   claude plugin install emil-design-engineering@omelette --scope local
    ```
 
-3. Then, in Claude Code: `/design-harness:kickoff`, with or without a mood board. It writes `.claude/settings.json`,
-   which keeps these plugins enabled for everyone who opens the project.
+3. Then, in Claude Code: `/design-harness:kickoff`, with or without a mood board. It writes `.claude/settings.local.json`,
+   which keeps these plugins enabled on your machine only and stays out of git, so a client's developers are never
+   asked to install a marketplace they cannot reach.
 
 ## What a project ends up with
 
@@ -97,7 +98,8 @@ your-project/
   docs/ui-consistency.md    the rules sibling surfaces must share; grows from corrections
   src/styles/theme.css      generated from DESIGN.md; the only place raw values live
   .claude/design-harness.json   which files render, the theme files, the dev server, copy limits
-  .claude/settings.json     the marketplace and the enabled plugins
+  .claude/settings.json     the pinned DESIGN.md linter, shared
+  .claude/settings.local.json   the marketplace and the enabled plugins, this machine only, not committed
 ```
 
 ## This repository
@@ -126,10 +128,10 @@ bench/                              the benchmark's cases, scripts, prompts and 
 ## Updating
 
 Pins are deliberate: an external skill changes only when its `sha` here is moved, after reading what changed, and a
-project changes harness version only when the `ref` tag in its `.claude/settings.json` is moved.
+project changes harness version only when the `ref` tag in its `.claude/settings.local.json` is moved.
 
-To release: run the tests (`npm install` once, for the pinned TypeScript the checks parse with, then `npm test`), bump `version` in both manifests, update the `ref`
-in `skills/kickoff/templates/settings.json`, commit, and tag `vX.Y.Z`. Re-run the benchmark when the reviewer, its
+To release: check the tests are green on CI (they run on every push; locally, `npm install` once for the pinned TypeScript the checks parse with, then `npm test`), bump `version` in both manifests, update the `ref`
+in `skills/kickoff/templates/settings.local.json`, commit, and tag `vX.Y.Z`. Re-run the benchmark when the reviewer, its
 rules or its model change.
 
 ## What it does not cover yet

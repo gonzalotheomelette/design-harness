@@ -928,9 +928,18 @@ test('with the dev server up, the checks always run and screenshots only when th
   const ask = async (screenshots) => {
     const port = 4400 + Math.floor(Math.random() * 500)
     const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx'], devServer: `http://localhost:${port}`, ...(screenshots ? { screenshots: true } : {}) })
-    const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: dir, stdio: 'ignore' })
+    // A Node server, not python3 -m http.server: on GitHub's macOS runners python3 sometimes took over 15 seconds to
+    // start listening, and the hook rightly saw nothing there. It runs as its own process from the checkout, as a
+    // real dev server would, because server-of matches the listening process's working directory.
+    const serve = `require('node:http').createServer((q, s) => s.end('ok')).listen(${port}, '127.0.0.1')`
+    const server = spawn(process.execPath, ['-e', serve], { cwd: dir, stdio: 'ignore' })
     try {
-      for (let i = 0; i < 40 && !check(dir, 'server-of.mjs').stdout.includes(': yes'); i++) await new Promise((r) => setTimeout(r, 100))
+      let up = ''
+      for (let i = 0; i < 50 && !up.includes(': yes'); i++) {
+        up = check(dir, 'server-of.mjs').stdout
+        if (!up.includes(': yes')) await new Promise((r) => setTimeout(r, 100))
+      }
+      assert.match(up, /: yes/, `the test server never came up: ${up}`)
       hook(dir, 'UserPromptSubmit')
       write(dir, { 'src/a.tsx': 'y\n' })
       return askFor(dir)

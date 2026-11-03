@@ -1,6 +1,6 @@
 # How well the reviewer works, and how it was measured
 
-Measured 2026-10-31 on two projects: The client prototype, where this harness was built, and Omelette's website, held out from
+Measured 2026-10-31 on two projects: a client prototype, where this harness was built, and Omelette's website, held out from
 it. Re-run it whenever the reviewer, its rules or its model change; `bench/` holds the cases, scripts, prompts and
 scores, and `bench/README.md` the steps. A change that lowers the hit rate or raises the noise is a regression.
 
@@ -53,7 +53,7 @@ the next candidates for the same treatment. `bench/scores-v0.12.1/` holds both j
 
 ## Results for 0.7.0: three runs per case, two projects
 
-13 cases: the 7 the client prototype cases below and 6 from the website, chosen by the same rule (a commit that removed copy or a
+13 cases: the 7 client cases below and 6 from the website, chosen by the same rule (a commit that removed copy or a
 device the designer objected to, whose removed lines one earlier commit wrote; three candidates were dropped because
 the wording built up over several commits, came from the first commit, or the correction was to an image). The
 website's messages rarely quote the designer, so its cases rest on what the fix did more than on his words. Each case
@@ -64,7 +64,7 @@ within this table, not with the one below.
 
 | Project | Reviewer | Hits | Partial | Miss | Findings per review | Not worth the time |
 |---|---|---|---|---|---|---|
-| the client prototype (32 corrections) | 0.7.0, run 1 | 11 | 9 | 12 | 13.4 | 14% |
+| Client prototype (32 corrections) | 0.7.0, run 1 | 11 | 9 | 12 | 13.4 | 14% |
 | | 0.7.0, run 2 | 11 | 8 | 13 | 12.6 | 12% |
 | | 0.7.0, run 3 | 14 | 8 | 10 | 11.9 | 13% |
 | | 0.6.0 | 7 | 7 | 18 | 11.7 | 15% |
