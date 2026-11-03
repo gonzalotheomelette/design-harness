@@ -930,7 +930,14 @@ test('with the dev server up, the checks always run and screenshots only when th
     const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx'], devServer: `http://localhost:${port}`, ...(screenshots ? { screenshots: true } : {}) })
     const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: dir, stdio: 'ignore' })
     try {
-      for (let i = 0; i < 40 && !check(dir, 'server-of.mjs').stdout.includes(': yes'); i++) await new Promise((r) => setTimeout(r, 100))
+      // A CI runner can take seconds to start the server; without this the hook sees nothing listening and the
+      // assertions below fail as if the hook were wrong.
+      let up = ''
+      for (let i = 0; i < 150 && !up.includes(': yes'); i++) {
+        up = check(dir, 'server-of.mjs').stdout
+        if (!up.includes(': yes')) await new Promise((r) => setTimeout(r, 100))
+      }
+      assert.match(up, /: yes/, `the test server never came up: ${up}`)
       hook(dir, 'UserPromptSubmit')
       write(dir, { 'src/a.tsx': 'y\n' })
       return askFor(dir)
