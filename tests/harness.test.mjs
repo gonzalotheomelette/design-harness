@@ -928,7 +928,11 @@ test('with the dev server up, the checks always run and screenshots only when th
   const ask = async (screenshots) => {
     const port = 4400 + Math.floor(Math.random() * 500)
     const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx'], devServer: `http://localhost:${port}`, ...(screenshots ? { screenshots: true } : {}) })
-    const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: dir, stdio: 'ignore' })
+    const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: dir, stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    let exit = 'running'
+    server.stderr.on('data', (d) => (stderr += d))
+    server.on('exit', (code, signal) => (exit = `exited ${code ?? signal}`))
     try {
       // A CI runner can take seconds to start the server; without this the hook sees nothing listening and the
       // assertions below fail as if the hook were wrong.
@@ -937,7 +941,10 @@ test('with the dev server up, the checks always run and screenshots only when th
         up = check(dir, 'server-of.mjs').stdout
         if (!up.includes(': yes')) await new Promise((r) => setTimeout(r, 100))
       }
-      assert.match(up, /: yes/, `the test server never came up: ${up}`)
+      if (!up.includes(': yes')) {
+        const http = await fetch(`http://127.0.0.1:${port}/`).then((r) => `answers ${r.status}`, (e) => `no answer (${e.cause?.code ?? e.message})`)
+        assert.fail(`the test server never came up: ${up.trim()}; python ${exit}, ${http}; stderr: ${stderr.trim() || 'none'}`)
+      }
       hook(dir, 'UserPromptSubmit')
       write(dir, { 'src/a.tsx': 'y\n' })
       return askFor(dir)
