@@ -1,8 +1,10 @@
 # How well the reviewer works, and how it was measured
 
 Measured 2026-10-31 on two projects: a client prototype, where this harness was built, and Omelette's website, held out from
-it. Re-run it whenever the reviewer, its rules or its model change; `bench/` holds the cases, scripts, prompts and
-scores, and `bench/README.md` the steps. A change that lowers the hit rate or raises the noise is a regression.
+it. Re-run it whenever the reviewer, its rules or its model change; `bench/` holds the scripts and prompts, and
+`bench/README.md` the steps. The cases, answer keys, reports and scores quote the projects' code, so they are not in
+this tree; `bench/README.md` says how to restore them. A change that lowers the hit rate or raises the noise is a
+regression.
 
 ## Method
 
@@ -26,8 +28,8 @@ The question: do pictures catch the visual corrections the code-only reviews mis
 the way the harness ships, three times each: each case's site built and served, a packet per run, and a headless
 Claude Code session with the plugin loaded that took screenshots (scrolled screen by screen, light and dark, desktop
 and phone) and an accessibility run, then called the real `design-harness:ui-review` agent. The corrections were
-listed from the answer keys alone, before any report was read (`bench/website/corrections.json`, 21 of them, 7 that
-only show on the rendered page). Two Opus judges then scored all six reports per case independently, the three new
+listed from the answer keys alone, before any report was read (21 of them, 7 that only show on the rendered
+page). Two Opus judges then scored all six reports per case independently, the three new
 runs beside the three 0.7.0 code-only runs, shuffled. They agreed on 120 of 126 marks (95%, Cohen's kappa 0.91).
 
 | Per run, of 21 corrections | Hits | Partial | Miss | Findings per review | Not worth the time |
@@ -38,17 +40,17 @@ runs beside the three 0.7.0 code-only runs, shuffled. They agreed on 120 of 126 
 | The 7 visual-only corrections, 0.7.0 | 0 | 2.0 | 6.0 | | |
 
 What it says: **the screenshots did not catch the visual corrections.** Hits are the same with and without them, and
-on the seven corrections that only show on the page (line breaks, a 28px gap out of line, two animations stacked on
-phones, a near-black that should match its neighbour), neither version found one, and the code-only runs came closer.
+on the seven corrections that only show on the page (line breaks, spacing out of line, animations stacked on phones,
+a colour that should match its neighbour), neither version found one, and the code-only runs came closer.
 The newer reviewer is more concise (6 findings per review against 10) at the same share of noise. Pictures cost 1.5 to
 4 minutes a review on this project.
 
 What does catch one class of them is a measurement, not a picture: the line-break check added after this run
-(`check-breaks.mjs`), run on case W6's pages, flagged 29 bad breaks, among them the exact ones that case's fix
-corrected ("Leave with the / part that matters.", "For product teams with / more ideas than time to / build them").
+(`check-breaks.mjs`), run on one case's pages, flagged 29 bad breaks, among them the exact ones that case's fix
+corrected.
 The others (spacing out of line with its siblings, a colour that should match, how many animations a phone shows) are
-the next candidates for the same treatment. `bench/scores-v0.12.1/` holds both judges' scores and the blind key, and
-`python3 bench/scripts/tally-two-judges.py bench/scores-v0.12.1` reproduces this table;
+the next candidates for the same treatment. With the data restored, `python3 bench/scripts/tally-two-judges.py
+$BENCH_DATA/scores-v0.12.1` reproduces this table from both judges' scores and the blind key;
 `bench/scripts/run-website.sh` repeats the run.
 
 ## Results for 0.7.0: three runs per case, two projects
@@ -80,10 +82,9 @@ What it says:
   it, from a single 0.6.0 run: no difference shown there.
 - **It is a copy reviewer.** On the client prototype, where the corrections were mostly wordy copy and explainer lines, it found a
   third to nearly half outright and 8 or 9 more in part, with few findings wasted. On the website, where the
-  corrections were mostly visual (line breaks, a 44px gap, two animations stacked, a near-black that should match) or
-  product calls code cannot show ("sprint" to "collaboration", dropping a privacy line, trimming the nav), it found 2
-  of 19 outright, and two in five of its findings were not worth the time. Its partial hits there were the copy and
-  chrome ones: the draft banner, the eyebrows, the founder label.
+  corrections were mostly visual (line breaks, spacing, stacked animations, a colour that should match) or product
+  calls code cannot show (a word changed, a line dropped, the nav trimmed), it found 2 of 19 outright, and two in five
+  of its findings were not worth the time. Its partial hits there were the copy and chrome ones.
 - **A held-out project is where the honest number lives.** The copy limits were measured on the client prototype's approved copy,
   and the gap between the two projects is mostly that home advantage plus the kind of correction each one got.
 
@@ -97,8 +98,8 @@ What it says:
 | OneRedOak design-review | 4 | 8 | 6 | 18.9 | 27% | 163 s |
 
 Impeccable's hits often sat 15th to 26th in its list at low confidence, so a designer reading it would still have
-found them alone. The wider reviewers did find real behaviour bugs the per-turn reviewer did not (a payment sheet
-dismissed before it records, a date input with no limits), which is why `web-design-guidelines` runs before a PR.
+found them alone. The wider reviewers did find real behaviour bugs the per-turn reviewer did not, in forms and
+sheets, which is why `web-design-guidelines` runs before a PR.
 
 No reviewer caught a placement inconsistency that only shows in a screenshot; the replays ran without a dev server.
 
@@ -130,8 +131,8 @@ How this run differed from what ships, so its numbers are not read as more than 
 case's whole commit, not only its rendered files (fixed in `bench/scripts/make-packet.mjs` since, which now builds the
 packet as the hook does); the reviewers were general Sonnet agents given the plugin's instructions, which in this
 session had no Grep or Glob and searched with read-only grep instead, not the plugin agent itself; and 0.6.0 ran once
-per case. The client prototype's answer keys and reports are not published (they quote a client's code), so 32 of the 51
-corrections can be checked only by someone with that repository.
+per case. The client prototype's answer keys and reports were never kept (they quote a client's code), so 32 of the
+51 corrections can be checked only by someone with that repository.
 
 Thirteen cases, three runs each, one model judge per case: enough to see run-to-run spread and a version difference
 of the size measured, not small ones. The website is held out from the copy limits and the review rules, though not

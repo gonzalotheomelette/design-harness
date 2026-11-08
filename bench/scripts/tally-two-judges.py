@@ -1,11 +1,11 @@
 # Unblinds two judges' scores, totals each version's hits per run, and measures how often the judges agree.
 # A correction counts as a hit when both judges say HIT, as partial when neither says MISS, otherwise as a miss.
-# Usage: python3 bench/scripts/tally-two-judges.py <judging dir>
+# Usage: BENCH_DATA=<restored bench data> python3 bench/scripts/tally-two-judges.py <judging dir>
 import json, os, sys, collections
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.environ.get('BENCH_DATA') or sys.exit('Set BENCH_DATA to the restored bench data (see bench/README.md).')
 J = sys.argv[1]
 key = json.load(open(f'{J}/blind-key.json'))
-corr = json.load(open(f'{HERE}/website/corrections.json'))
+corr = json.load(open(f'{DATA}/website/corrections.json'))
 same = total = 0
 pairs = collections.Counter()
 tot = collections.defaultdict(collections.Counter)

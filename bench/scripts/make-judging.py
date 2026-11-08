@@ -1,8 +1,11 @@
 import json, os, random, re, shutil, sys
+# Usage: BENCH_DATA=<restored bench data> python3 bench/scripts/make-judging.py <run dir>
 B = sys.argv[1]
+DATA = os.environ.get('BENCH_DATA') or sys.exit('Set BENCH_DATA to the restored bench data (see bench/README.md).')
+CASES = [l.split('\t') for l in open(f'{DATA}/cases.tsv').read().splitlines()[1:] if l.strip()]
 random.seed(20261031)
 key = {}
-for k in ['W1','W2','W3','W5','W6','W7','K1','K2','K3','K4','K5','K6','K7']:
+for k in [c[0] for c in CASES]:
     src = {'v070-run1': f'{B}/reports/{k}-run1.md', 'v070-run2': f'{B}/reports/{k}-run2.md',
            'v070-run3': f'{B}/reports/{k}-run3.md', 'v060-run1': f'{B}/reports-0.6.0/{k}-run1.md'}
     missing = [n for n, p in src.items() if not os.path.exists(p)]
