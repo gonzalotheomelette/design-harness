@@ -31,7 +31,9 @@ Skip it for one-off feature decisions (what a single page contains) and for anyt
 7. If the rule can be checked mechanically (a word count, a forbidden class, a required prop), say so: it may
    belong in a check rather than in the reviewer's judgement.
 
-Add the row under the right heading, in this shape:
+Add the row under the right heading, adding the heading when the file does not have it yet (Buttons and actions,
+Toasts and receipts, Dialogs and drawers, Forms, Lists, tables and rows, Pickers and filters, Empty states, notices
+and alerts, Copy, Layout and spacing, Icons), in this shape:
 
 | Rule (what must match) | How to check it | Reference implementation | Source |
 |---|---|---|---|

@@ -1,5 +1,7 @@
 ---
 version: alpha
+# Every value below is a stand-in that kickoff replaces from the mood board. The primary is a loud magenta on purpose:
+# a stand-in that looks like a choice (a calm blue, a tidy radius) is the kind that ships without anyone choosing it.
 name: "{Product name}"
 description: "{One line: the identity in a sentence}"
 colors:
@@ -7,8 +9,8 @@ colors:
   canvas: "#fbfbfa"
   muted: "#6b6b73"
   line: "#e4e4e7"
-  primary: "#2f5bd3"
-  on-primary: "#ffffff"
+  primary: "#ff00ff"
+  on-primary: "#000000"
 typography:
   display:
     fontFamily: "{Display face}"

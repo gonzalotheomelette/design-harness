@@ -98,11 +98,11 @@ your-project/
   design/artwork/           illustration and photography
   design/references/        pattern references, and anything imported (Claude Design, Figma, an existing site)
   docs/product/             one requirement per surface or flow: what it does, its data, its states, its acts
-  docs/decision-log.md      every decision, dated, in the words of whoever made it
-  docs/open-questions.md    what is waiting on the client
+  docs/decision-log.md      every decision, dated, in the words of whoever made it (from the first one recorded)
+  docs/open-questions.md    what is waiting on the client (from the first question)
   docs/ui-consistency.md    the rules sibling surfaces must share; grows from corrections
   src/styles/theme.css      generated from DESIGN.md; the only place raw values live
-  .claude/design-harness.json   which files render, the theme files, the dev server, copy limits
+  .claude/design-harness.json   what differs from the harness's defaults: the dev server, the colour modes
   .claude/settings.json     the pinned DESIGN.md linter, shared
   .claude/settings.local.json   the marketplace and the enabled plugins, this machine only, not committed
 ```
@@ -135,8 +135,8 @@ bench/                              the benchmark's scripts and prompts, to reru
 Pins are deliberate: an external skill changes only when its `sha` here is moved, after reading what changed, and a
 project changes harness version only when the `ref` tag in its `.claude/settings.local.json` is moved.
 
-To release: check the tests are green on CI (they run on every push; locally, `npm install` once for the pinned TypeScript the checks parse with, then `npm test`), bump `version` in both manifests, update the `ref`
-in `skills/kickoff/templates/settings.local.json`, commit, and tag `vX.Y.Z`. Re-run the benchmark when the reviewer, its
+To release: check the tests are green on CI (they run on every push; locally, `npm install` once for the pinned TypeScript the checks parse with, then `npm test`), bump `version` in both manifests, commit, and tag `vX.Y.Z`. A kickoff pins a new project
+to the `version` in `plugin.json`, so nothing else names the release. Re-run the benchmark when the reviewer, its
 rules or its model change.
 
 ## What it does not cover yet
