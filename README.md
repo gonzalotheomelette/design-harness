@@ -127,7 +127,7 @@ plugins/design-harness/
                                     own Playwright or Puppeteer
 dotfiles/CLAUDE.md                  Gonzalo's working rules for every project; install.sh links it
 docs/benchmark.md                   method and results
-bench/                              the benchmark's cases, scripts, prompts and scores, to rerun it
+bench/                              the benchmark's scripts and prompts, to rerun it (its data stays in history)
 ```
 
 ## Updating

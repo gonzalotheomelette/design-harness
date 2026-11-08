@@ -4,9 +4,10 @@
 # design-harness:ui-review agent and saves its report. One server at a time, runs one after another, and a run that
 # brings back no report is tried once more.
 #
-# Needs, under $WORK: cases/<case> (worktrees of the website at each case's introducing commit, from cases.tsv),
+# Needs BENCH_DATA, the restored bench data (see bench/README.md), and under $WORK: cases/<case> (worktrees of the
+# website at each case's introducing commit, from cases.tsv),
 # tools/node_modules (puppeteer-core and @axe-core/puppeteer) and astro/node_modules (the site's packages).
-# Usage: WORK=<dir> [CASES="W1 W2"] [RUNS="1 2 3"] bench/scripts/run-website.sh
+# Usage: BENCH_DATA=<dir> WORK=<dir> [CASES="W1 W2"] [RUNS="1 2 3"] bench/scripts/run-website.sh
 set -u
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 H=$HERE/../plugins/design-harness
@@ -15,9 +16,10 @@ OUT=$WORK/out
 PORT=${PORT:-4399}
 mkdir -p $OUT/packets $OUT/reports $OUT/logs
 LOG=$OUT/progress.log
-purpose() { awk -F'\t' -v k="$1" '$1==k {print $5}' $HERE/cases.tsv; }
+DATA=${BENCH_DATA:?Set BENCH_DATA to the restored bench data (see bench/README.md).}
+purpose() { awk -F'\t' -v k="$1" '$1==k {print $5}' $DATA/cases.tsv; }
 
-for K in ${CASES:-W1 W2 W3 W5 W6 W7}; do
+for K in ${CASES:-$(awk -F'\t' '$2=="website" {print $1}' $DATA/cases.tsv)}; do
   C=$WORK/cases/$K
   ln -sfn $WORK/tools/node_modules $C/node_modules
   mkdir -p $C/.claude && printf '{"devServer":"http://localhost:%s"}\n' $PORT > $C/.claude/design-harness.json

@@ -1,8 +1,15 @@
 # Rerunning the benchmark
 
-Everything needed to repeat the 2026-10-31 run, except the two projects' code: `cases.tsv` names each case's
-introducing commit and the fix that corrected it, in the website (`gonzalotheomelette/omelette-website`) and a client prototype.
-The website's answer keys and reports are here. The client prototype's keys quote its code, so only its scores are.
+The steps and scripts to repeat the 2026-10-31 and 2026-11-01 runs. The data they ran on is not in this tree,
+because it quotes the projects' code and describes a client's product: `cases.tsv` (each case's introducing commit,
+the fix that corrected it and what the change was for, in the website `gonzalotheomelette/omelette-website` and a
+client prototype), the website's answer keys, reports and correction list, and both rounds' scores. It stays in this
+repository's history up to commit `2409cae`. Restore it into a folder outside the checkout and point the scripts at it:
+
+    mkdir <data> && git archive 2409cae bench | tar -x -C <data> --strip-components=1
+    export BENCH_DATA=<data>
+
+The client prototype's answer keys were never kept, since they quote its code; only its scores were.
 
 ## Steps
 
@@ -18,7 +25,7 @@ The website's answer keys and reports are here. The client prototype's keys quot
    > You are acting as the `ui-review` agent in a benchmark. Read your instructions in full first:
    > `<harness>/agents/ui-review.md`, and follow them, with these adjustments: the project is checked out at
    > `<worktree>`, read-only; use only Read, Grep and Glob on it. Your prompt: packet: `<packet>`; fingerprint:
-   > `<case>-run<n>`; what the change is for: "<from cases.tsv>". When done, write your complete report to
+   > `<case>-run<n>`; what the change is for: "<from $BENCH_DATA/cases.tsv>". When done, write your complete report to
    > `<reports>/<case>-run<n>.md`, then reply with one line: how many findings you reported.
 
 5. `python3 scripts/make-judging.py <dir>` shuffles each case's reports (three runs of this version, one of the
