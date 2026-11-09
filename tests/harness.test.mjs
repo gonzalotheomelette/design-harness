@@ -1179,7 +1179,9 @@ test('a review run in the background counts once the app hands its report back, 
     return p
   }
   // controls: the token from another agent, or typed by the session itself, is not a review
-  assert.ok(hook(dir, 'Stop', { transcript_path: t(handback('agentOther', `review-token: ${token}\nreport`)), stop_hook_active: true }).out, 'another agent\'s hand-back does not count')
+  hook(dir, 'Stop', { transcript_path: t(handback('agentOther', `review-token: ${token}\nreport`)), stop_hook_active: true })
+  const log = join(gitDir(dir), 'review-before-show.log')
+  assert.ok(!existsSync(log) || !readFileSync(log, 'utf8').includes(fp), 'another agent\'s hand-back does not count: the review is not logged')
   const fresh = repo({ 'src/a.tsx': 'x\n' })
   hook(fresh, 'UserPromptSubmit')
   write(fresh, { 'src/a.tsx': 'y\n' })
@@ -1198,7 +1200,9 @@ test('a review run in the background counts once the app hands its report back, 
   const typed = { type: 'user', message: { content: [{ type: 'text', text: `review-token: ${tokenOf(typedRepo, fp3)}` }] } }
   const p3 = join(typedRepo, 'typed.jsonl')
   writeFileSync(p3, [call3, launched, typed].map((e) => JSON.stringify(e)).join('\n'))
-  assert.match(hook(typedRepo, 'Stop', { transcript_path: p3 }).out?.hookSpecificOutput?.additionalContext ?? '', /has not reported/, 'a token typed into the conversation is not a review')
+  hook(typedRepo, 'Stop', { transcript_path: p3 })
+  const log3 = join(gitDir(typedRepo), 'review-before-show.log')
+  assert.ok(!existsSync(log3) || !readFileSync(log3, 'utf8').includes(fp3), 'a token typed into the conversation is not a review: nothing is logged')
 })
 
 // 2026-11-09, the retest of 0.18.1 in a website worktree session: the reviewer's hand-back reached the session as a
@@ -1232,4 +1236,42 @@ test('work from a message the hook never saw start is carried, not lost', () => 
   const ctx = hook(dir, 'Stop').out?.hookSpecificOutput?.additionalContext ?? ''
   assert.match(ctx, /ui-review/)
   assert.ok(existsSync(join(packetDir(dir, fpOf(ctx)), 'carried.diff')), 'the earlier work reaches the reviewer as carried')
+})
+
+test('while the reviewer and then the critic run in the background, the turn ends quietly, and their hand-backs finish the gate', () => {
+  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  hook(dir, 'UserPromptSubmit', { prompt: 'make home less plain' })
+  write(dir, { 'src/pages/home.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  const entries = []
+  const t = () => {
+    const p = join(dir, `t-${entries.length}.jsonl`)
+    writeFileSync(p, entries.map((e) => JSON.stringify(e)).join('\n'))
+    return p
+  }
+  const launch = (id, agent, agentId, f) => entries.push(
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Agent', input: { subagent_type: agent, prompt: `fingerprint: ${f}` } }] } },
+    { type: 'user', message: { content: [{ tool_use_id: id, type: 'tool_result', content: 'Async agent launched successfully.' }] }, toolUseResult: { status: 'async_launched', agentId } },
+  )
+  const handBack = (from, text) => entries.push({ type: 'user', isMeta: true, message: { content: 'Another Claude session sent a message' }, origin: { kind: 'peer', from, handback: true, handbackReportText: text } })
+  const state = () => JSON.parse(readFileSync(join(gitDir(dir), 'review-before-show.s1.json'), 'utf8'))
+
+  launch('toolu_R', 'design-harness:ui-review', 'agR', fp)
+  assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null, 'the reviewer is running: the turn ends quietly')
+  assert.equal(hook(dir, 'Stop', { transcript_path: t(), stop_hook_active: true }).out, null, 'and again, with no "was not reviewed" note')
+  assert.equal(state().blocks, 1, 'waiting does not spend the once-a-message ask')
+
+  hook(dir, 'UserPromptSubmit', { prompt: HANDBACK })
+  handBack('agR', `review-token: ${tokenOf(dir, fp)}\nNo findings.`)
+  assert.match(hook(dir, 'Stop', { transcript_path: t() }).out?.hookSpecificOutput?.additionalContext ?? '', /design-harness:art-direction/)
+
+  launch('toolu_C', 'design-harness:art-direction', 'agC', fp)
+  assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null, 'the critic is running: the turn ends quietly')
+  assert.equal(hook(dir, 'Stop', { transcript_path: t(), stop_hook_active: true }).out, null, 'and again, with no "did not report" note')
+  assert.notEqual(state().tasteDone, fp, 'a critique still running is not done')
+
+  hook(dir, 'UserPromptSubmit', { prompt: HANDBACK })
+  handBack('agC', `review-token: ${readFileSync(join(gitDir(dir), 'design-harness', 'tokens', `taste-${fp}`), 'utf8').trim()}\nVERDICT: not ready to show`)
+  assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null)
+  assert.equal(state().tasteDone, fp, 'done because the critique reported')
 })
