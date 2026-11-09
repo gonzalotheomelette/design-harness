@@ -11,7 +11,7 @@
     {
       "name": "design-harness",
       "source": "./plugins/design-harness",
-      "version": "0.18.0",
+      "version": "0.18.1",
       "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift, accessibility, line-break and layout checks, an art-direction critic that judges taste against the designer's own references and picks, a mood-board kickoff, and a learn skill that turns corrections into rules and picks into a record.",
       "category": "design"
     },
