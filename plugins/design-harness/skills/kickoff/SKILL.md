@@ -22,6 +22,11 @@ Ask for what is missing, in one message, conversationally:
   (a marketing page: one idea, one signature move), *Read* (long-form). A product usually has more than one.
 - **A mood board, if there is one.** Images in a folder, links, a Figma file, a Mobbin collection. Read every image.
   If there is none, that is the normal case: build it together in step 1b.
+- **Three to five sites whose taste they trust**, for the pages that persuade or are read: whole sites, not features,
+  and a line on what each does that they want. Run the `references` skill on them before any of those pages is
+  designed: they are the bar the art-direction critic judges against. Without them the critic falls back on the
+  model's own defaults, and every page drifts to the average of its category (2026-11-09: a Method page and two rounds
+  of proposals for it, all "very simple and questionable", with no reference picked for the site).
 
 Then pull references by **pattern class**, not feature ("resource calendar with staff as rows", not "scheduling
 page") from Mobbin when it is connected, and note what each reference does structurally.
@@ -159,6 +164,10 @@ From `${CLAUDE_SKILL_DIR}/templates/`, and from the settings written out below:
   it. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. Screenshots stay off: the
   accessibility and line-break checks run whenever the dev server is up, but screenshots in every review cost
   minutes and, measured, caught nothing more; add `"screenshots": true` for a project where layout is the work.
+  `artDirection` lists the rendered files of the pages PRODUCT.md marks Persuade or Read (for a site in Astro, say
+  `src/pages/index.astro`, `src/components/home/**`): a change to one is held for the art-direction critic after the
+  reviewer, so a marketing page is never handed back on clean checks alone. Leave Operate screens out; the reviewer
+  covers them.
   Commit the file: the harness reads its settings from the last commit, so a change cannot loosen them on the way
   through.
 - A project tool that takes screenshots as a signed-in persona, or a browser outside the usual places, goes in
@@ -187,7 +196,8 @@ From `${CLAUDE_SKILL_DIR}/templates/`, and from the settings written out below:
       "design-harness@omelette": true,
       "frontend-design@omelette": true,
       "modern-web-guidance@omelette": true,
-      "emil-design-engineering@omelette": true
+      "emil-design-engineering@omelette": true,
+      "stageshow@omelette": true
     }
   }
   ```

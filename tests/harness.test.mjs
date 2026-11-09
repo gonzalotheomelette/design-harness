@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, r
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, globToRegExp, layoutFlags, lineFlags, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
+import { DEFAULTS, globToRegExp, layoutFlags, lineFlags, localTargets, matchesAny, pageTargets, projectRequire } from '../plugins/design-harness/bin/lib.mjs'
 
 const HARNESS = join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins', 'design-harness')
 const HOOK = join(HARNESS, 'hooks', 'review-before-show.mjs')
@@ -1064,4 +1064,86 @@ test('the kickoff\'s project settings leave the file lists to the defaults', () 
   assert.equal(template.ui, undefined)
   assert.equal(template.themeFiles, undefined)
   for (const ext of ['tsx', 'jsx', 'vue', 'svelte', 'astro', 'html', 'css']) assert.ok(DEFAULTS.ui.includes(`**/*.${ext}`), ext)
+})
+
+// Art direction (2026-11-09): pages that persuade or are read get the critic after the reviewer, with the same proof of
+// reading, once a message, and never a loop.
+const TASTE = { ui: ['src/**/*.tsx'], themeFiles: ['**/theme.css'], artDirection: ['src/pages/**'] }
+const criticReported = (dir, fp, transcript, id = 'toolu_C', token = readFileSync(join(gitDir(dir), 'design-harness', 'tokens', `taste-${fp}`), 'utf8').trim()) => {
+  const call = { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Agent', input: { subagent_type: 'design-harness:art-direction', prompt: `packet: x\nfingerprint: ${fp}` } }] } }
+  const done = { type: 'user', message: { content: [{ tool_use_id: id, type: 'tool_result', content: [{ type: 'text', text: `review-token: ${token}\nVERDICT: not ready to show` }] }] }, toolUseResult: { status: 'completed' } }
+  const p = join(dir, `${id}.jsonl`)
+  writeFileSync(p, [readFileSync(transcript, 'utf8'), ...[call, done].map((e) => JSON.stringify(e))].join('\n'))
+  return p
+}
+
+test('a change to an art-directed page is held for the critic after the reviewer, until its report carries the token', () => {
+  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  hook(dir, 'UserPromptSubmit', { prompt: 'make the home page less plain' })
+  write(dir, { 'src/pages/home.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  const afterReview = hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out?.hookSpecificOutput?.additionalContext ?? ''
+  assert.match(afterReview, /design-harness:art-direction/)
+  assert.match(afterReview, new RegExp(`fingerprint: ${fp}`))
+  assert.match(afterReview, /direction-packet\.mjs --packet=/)
+  assert.match(afterReview, /src\/pages\/home\.tsx/)
+  const packet = join(gitDir(dir), 'design-harness', 'direction', fp)
+  const readme = readFileSync(join(packet, 'README.md'), 'utf8')
+  assert.match(readme.split('\n')[0], /^review-token: [0-9a-f]{16}$/)
+  assert.match(readme, /make the home page less plain/, "the person's own words reach the critic")
+  // a report without the token is not a critique
+  const forged = criticReported(dir, fp, reported(dir, fp), 'toolu_F', 'deadbeefdeadbeef')
+  assert.match(hook(dir, 'Stop', { transcript_path: forged, stop_hook_active: true }).out?.hookSpecificOutput?.additionalContext ?? '', /did not open its packet/)
+  assert.equal(hook(dir, 'Stop', { transcript_path: criticReported(dir, fp, reported(dir, fp)) }).out, null, 'the critique with the token ends it')
+})
+
+test('a change outside the art-directed pages gets the reviewer only', () => {
+  const dir = repo({ 'src/app/table.tsx': 'x\n' }, TASTE)
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/app/table.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  assert.equal(hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out, null)
+})
+
+test('a critic that is never run lets the turn end with a note to the person, not a loop', () => {
+  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/pages/home.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  const t = reported(dir, fp)
+  assert.match(hook(dir, 'Stop', { transcript_path: t }).out?.hookSpecificOutput?.additionalContext ?? '', /art-direction/)
+  assert.match(hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out?.systemMessage ?? '', /critic did not report/)
+  assert.equal(hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out, null)
+})
+
+test('the critic has no shell, and its packet lists every picture by path with the mode from PRODUCT.md', () => {
+  const agent = readFileSync(join(HARNESS, 'agents', 'art-direction.md'), 'utf8')
+  assert.match(agent, /^tools: Read, Grep, Glob$/m)
+  assert.match(agent, /review-token/)
+  const src = readFileSync(join(HARNESS, 'bin', 'direction-packet.mjs'), 'utf8')
+  assert.match(src, /each by its full path/)
+  assert.match(src, /Persuade\|Read\|Operate/)
+})
+
+test('a session opened outside a harness project is told once when it edits that project', () => {
+  const here = repo({ 'notes.md': 'x\n' }, null)
+  const project = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  const t = join(here, 't.jsonl')
+  const sid = `o${Date.now()}` // the once-a-session record lives in the temp folder, so each run is its own session
+  const line = (o) => JSON.stringify(o)
+  const turn = (...tools) => [line({ type: 'user', message: { content: 'make the method page better' } }), ...tools.map((b, i) => line({ type: 'assistant', message: { content: [{ type: 'tool_use', id: `t${i}`, ...b }] } }))].join('\n')
+  // positive control first: edits inside the session's own folder say nothing
+  writeFileSync(t, turn({ name: 'Write', input: { file_path: join(here, 'notes.md'), content: 'y' } }))
+  assert.equal(hook(here, 'Stop', { transcript_path: t, session_id: sid }).out, null)
+  writeFileSync(t, turn({ name: 'Bash', input: { command: `cat > ${join(project, 'src', 'pages', 'home.tsx')} <<'X'\ny\nX` } }))
+  const out = hook(here, 'Stop', { transcript_path: t, session_id: sid }).out
+  assert.match(out?.systemMessage ?? '', new RegExp(`${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*runs the design harness`))
+  assert.equal(hook(here, 'Stop', { transcript_path: t, session_id: sid }).out, null, 'once a session, per project')
+})
+
+test('a browser library in a package one folder down is found, so the checks run from the project root', () => {
+  const dir = repo({ 'site/package.json': '{"name":"site"}', 'site/node_modules/fake-browser/package.json': '{"name":"fake-browser","main":"index.js"}', 'site/node_modules/fake-browser/index.js': 'module.exports = { found: true }' })
+  assert.equal(projectRequire(join(dir, 'site'), 'fake-browser')?.found, true, 'control: found from its own package')
+  assert.equal(projectRequire(dir, 'fake-browser')?.found, true, 'found from the root')
+  assert.equal(projectRequire(dir, 'not-installed-anywhere'), null)
 })

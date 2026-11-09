@@ -23,8 +23,23 @@ makes after the review are read by the next one.
   folders, a style tile and a sample screen, and switches the review loop on for the project.
 - **Rules that grow from corrections.** `/design-harness:learn` turns each correction into a row in the project's
   `docs/ui-consistency.md`, so the same slip is caught automatically next time.
+- **Taste, from your own references.** Everything above looks backward: it can say a page is inconsistent, broken or
+  AI-made, never that it is plain. `/design-harness:references` gathers references from Mobbin, inspo (832 real
+  production websites, shipped with the harness as an MCP server) and any site you name, and keeps only the ones you
+  pick, each with what it teaches. An art-direction critic judges whether a page has a point of view against those
+  references and your past picks (`design/picks.md`), and ends with a verdict. It is not optional: a change to a page
+  the project lists in `artDirection` (its Persuade and Read pages) is held after the review until the critic has
+  read it, with the same proof of reading, and its verdict is shown to you first. `/design-harness:direction` puts its
+  two or three directions on the page behind switches so you choose by looking. Run blind on 2026-11-09, it stopped
+  both proposals the designer had rejected that day ("not ready to show", 4 and 3 of 5 ways a page goes plain), and
+  was harsher than him on a live case page (2 of 5): it is not yet calibrated against his eye.
+- **Design work runs where the harness runs.** The review, the critic and the skills key off the session's own
+  folder. A session opened somewhere else that edits a project using the harness is told so, once, by name: one
+  afternoon's work on a website went unreviewed that way. The warning reaches only sessions where the plugin is
+  enabled, so enable it for your user, not just the project, if you open sessions outside your projects.
 - **The best public design skills**, pinned to a commit that was read and checked: Anthropic's frontend-design,
-  Google Chrome's modern-web-guidance and Emil Kowalski's design-engineering skills, on by default. Paul Bakaus's
+  Google Chrome's modern-web-guidance, Emil Kowalski's design-engineering skills and Benji Taylor's Stageshow (faux
+  product UI for case stills, films and heroes, filmed frame by frame to catch what a still cannot), on by default. Paul Bakaus's
   Impeccable is listed but off by default: it covers the same ground as frontend-design and the harness's AI-look
   register (which distils its useful rules), its opinions pull hardest against a project's own taste, and it downloads
   a program on first use. A project that wants its audit commands installs it and enables it in its settings.
@@ -84,6 +99,10 @@ nothing after their fixes, and none of the benchmark's other visual corrections,
    claude plugin install emil-design-engineering@omelette --scope local
    ```
 
+   ```bash
+   claude plugin install stageshow@omelette --scope local
+   ```
+
 3. Then, in Claude Code: `/design-harness:kickoff`, with or without a mood board. It writes `.claude/settings.local.json`,
    which keeps these plugins enabled on your machine only and stays out of git, so a client's developers are never
    asked to install the designer's tooling.
@@ -118,9 +137,14 @@ your-project/
 plugins/design-harness/
   hooks/                            review-before-show (Stop + UserPromptSubmit): the turn gate and the review packet
   agents/ui-review.md               the reviewer: the latest Opus, Read, Grep and Glob, no shell
+  agents/art-direction.md           the taste critic: judges against picked references, answers with directions and a verdict
+  bin/direction-packet.mjs          the critic's packet: pictures listed by path, each page's mode read from PRODUCT.md
+  .mcp.json                         inspo, real production websites as references (a hosted, read-only service)
   skills/kickoff/                   mood board to a project that knows its identity, with templates
   skills/design-pass/               the loop for building any surface
-  skills/learn/                     a correction becomes a rule
+  skills/learn/                     a correction becomes a rule, a pick becomes a record
+  skills/references/                references gathered, picked by the designer, kept with what each teaches
+  skills/direction/                 the critic's directions, built behind switches, chosen on the page
   skills/ux-copy/                   interface copy in the project's voice, short, with the sibling's verbs
   skills/feedback/                  client notes in (Google Docs, Claude Docs, Granola), sorted, built, answered
   skills/web-design-guidelines/     Vercel's wider review, for PR time
@@ -145,6 +169,12 @@ rules or its model change.
 
 ## What it does not cover yet
 
+- Taste, measured: the benchmark counts corrections caught, and a critic's directions are not corrections. Its
+  measure will be how often its verdict matches the designer's, and how often he picks one of its directions over
+  the page as it stands. The picks log is the data for both.
+- Briefs sent to Mobbin and inspo leave the machine. The references skill writes them without client names or
+  anything under NDA; inspo's hosted endpoint says it logs tool names and timings, never queries or IPs. Disable the
+  `inspo` server in `/mcp` for a project that must not use it.
 - Anything but macOS, on purpose: the dev-server proof uses `lsof` and the browser search knows Mac paths first.
 - Fixes made after a review reach the next review, not this turn's: a second review of every fix would double the
   wait for little.

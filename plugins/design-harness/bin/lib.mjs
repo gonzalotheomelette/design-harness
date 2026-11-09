@@ -2,7 +2,7 @@
 // file, and what the branch is compared against. One place, so the hook and the checks never disagree about
 // which change they are looking at.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -38,6 +38,11 @@ export const DEFAULTS = {
   screenshots: false,
   // The colour modes the product ships. Screenshots and accessibility run in each; a light-only product says so here.
   modes: ['light', 'dark'],
+  // Rendered files of the pages that persuade or are read (PRODUCT.md's Persuade and Read modes). A change to one is
+  // judged by the art-direction critic after the reviewer, before it is handed back: on 2026-11-09 two proposals
+  // passed every check and were called "very simple and questionable", and the critic, run blind afterwards, stopped
+  // both. Empty by default; the kickoff fills it from PRODUCT.md. Each critique costs about two minutes.
+  artDirection: [],
 }
 
 // The default output buffer (1 MB) is smaller than the diff of one large refactor, and the hook then threw on every
@@ -306,12 +311,22 @@ export function harnessTypescript() {
 }
 
 // A package resolved from the PROJECT, not from the plugin: only the browser libraries, which the session runs.
+// A library from the project, at its root or in a package one folder down (a site in site/, an app in web/). On
+// 2026-11-09 the website kept Puppeteer in site/, so every browser check run from its root said NOT RUN, and the
+// review packets carried no line-break, layout or accessibility result; the checks only ran when called by hand from
+// site/.
 export function projectRequire(root, name) {
+  const dirs = [root]
   try {
-    return createRequire(join(root, 'package.json'))(name)
-  } catch {
-    return null
+    for (const d of readdirSync(root, { withFileTypes: true }))
+      if (d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules' && existsSync(join(root, d.name, 'package.json'))) dirs.push(join(root, d.name))
+  } catch {}
+  for (const dir of dirs) {
+    try {
+      return createRequire(join(dir, 'package.json'))(name)
+    } catch {}
   }
+  return null
 }
 
 // A browser from whatever the project already has: Playwright, else Puppeteer. A project should not have to add a

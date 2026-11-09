@@ -5,8 +5,10 @@ description: The loop for building or reworking any visual surface - read what e
 
 # Design pass
 
-Output quality tracks what is written down concretely and what is checked. Taste is not the bottleneck; skipped
-steps are. Every rejection this loop was built from was avoidable by a step, not by better judgement.
+Output quality tracks what is written down concretely and what is checked. Most rejections this loop was built from
+were avoidable by a step, not by better judgement. The rest were taste: a page that passed every check and still
+read as plain. Steps 2 and 5 are where taste comes in, from references the designer picked and from a critic that
+judges against them.
 
 ## 1. Read what exists, before any markup
 
@@ -17,8 +19,9 @@ govern them.
 
 ## 2. Gather references, still before markup
 
-Search by **pattern class**, not feature: "resource calendar with staff as rows" finds what a scheduling page
-should be; "scheduling page" finds noise. Use Mobbin when it is connected. Look at what references do
+Start from `design/references/`: what the designer already picked, and what each pick teaches. When it has nothing
+for this pattern, run the `references` skill. Search by **pattern class**, not feature: "resource calendar with
+staff as rows" finds what a scheduling page should be; "scheduling page" finds noise. Look at what references do
 *structurally*. A grid of bordered cells where every reference uses a continuous surface is a structural problem,
 and trim will not fix it.
 
@@ -57,10 +60,18 @@ Then ask the questions the designer would:
 - Is it a first draft presented as a finished one?
 - Would it have been better if something existing had been reused? If yes, go back to step 1.
 
+For a marketing or reading page, or anything the designer has called basic, the art-direction critic judges it
+before it is shown: the review-before-show hook asks for it after the reviewer when the change touches a file the
+project lists in `artDirection`, and the `direction` skill runs it on demand. The reviewer checks it is right; the
+critic asks whether it has a point of view. If the project has no references yet, say so: the critique is weaker
+without them.
+
 ## 6. Show
 
-Say what you reused, what you took from references, what the reviewer flagged that you left, and what you are
-unsure of. Show live URLs rather than batches of screenshots.
+Lead with the critic's verdict when there is one, in its words, "not ready to show" included. Then say what you
+reused, what you took from references, what the reviewer flagged that you left, and what you are unsure of. Never call
+work ready because the checks are clean: they measure slips, not taste. Show live URLs rather than batches of
+screenshots.
 
 ## True everywhere
 

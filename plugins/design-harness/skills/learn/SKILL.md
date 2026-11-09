@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Turns a designer's correction into a written rule the reviewer will enforce. Use right after the designer corrects copy, a component's styling, placement, an icon, or anything that a sibling surface or a settled decision would have caught, so the same slip is caught automatically next time.
+description: Turns a designer's correction into a written rule the reviewer will enforce, and a designer's pick among options into a record the art-direction critic reads. Use right after the designer corrects copy, a component's styling, placement, an icon, or anything that a sibling surface or a settled decision would have caught, and whenever they choose between options, directions, toggles or references.
 ---
 
 # Learn from a correction
@@ -40,3 +40,18 @@ and alerts, Copy, Layout and spacing, Icons), in this shape:
 | A destructive act is the red button with the bin icon, everywhere | Any Delete, Remove or Discard: `color="red"` and the bin icon; no plain red text | `src/app/fleet/vehicle-record.tsx:351` | 2026-09-24, "it has no stroke like the others" |
 
 Then tell the designer, in one line, the rule you wrote and how many siblings break it.
+
+## When the designer picks
+
+A correction says what was wrong. A pick says what they want: which of several options, directions, toggles or
+references they chose, and which they left. Corrections become rules; picks are taste, and taste is a pattern across
+many picks, so they are kept as a log the art-direction critic reads, not as rules anyone enforces.
+
+Add a row to `design/picks.md` (create it with this header the first time) in the same turn as the pick:
+
+| Date | Surface | Shown | Picked | Left | Their words |
+|---|---|---|---|---|---|
+| 2026-11-09 | Home, Work, case pages | 21 proposals as toggles on the pages | Run-ins on phones, the glued breaks, a "Back" label | The hero strip cut, the team section cut, the "X, not Y" rewrites, 15 more | (none) |
+
+Write "Left" as carefully as "Picked": what the designer turned down, among options that were really shown, is as
+much taste as what they took. Never infer a pick they did not make, and quote only their words.

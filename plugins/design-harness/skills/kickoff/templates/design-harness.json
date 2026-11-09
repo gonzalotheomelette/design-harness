@@ -3,5 +3,6 @@
   "modes": [
     "light"
   ],
-  "allowPalette": false
+  "allowPalette": false,
+  "artDirection": []
 }

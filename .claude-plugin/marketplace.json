@@ -11,8 +11,8 @@
     {
       "name": "design-harness",
       "source": "./plugins/design-harness",
-      "version": "0.17.0",
-      "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift and accessibility checks, a mood-board kickoff, and a learn skill that turns corrections into rules.",
+      "version": "0.18.0",
+      "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift, accessibility, line-break and layout checks, an art-direction critic that judges taste against the designer's own references and picks, a mood-board kickoff, and a learn skill that turns corrections into rules and picks into a record.",
       "category": "design"
     },
     {
@@ -56,6 +56,20 @@
       },
       "strict": false,
       "description": "Emil Kowalski's design-engineering skills: animate, review-animations, break-ui (worst-case data), prototype (variants behind a picker), mobile-native. The repo's whole skills folder loads, including a few platform skills (Expo, Swift).",
+      "category": "design"
+    },
+    {
+      "name": "stageshow",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/benjitaylor/skills.git",
+        "path": "stageshow",
+        "sha": "299140fafd08df55a9c234e610c3f64af3f45531"
+      },
+      "skills": [
+        "./"
+      ],
+      "description": "Benji Taylor's Stageshow (MIT): faux product UI, as stills or short animations, built against gold examples and filmed frame by frame to catch one-frame jumps and text that does not fit. For case-study stills and films and product heroes. Filming needs playwright-core in the project and Chrome, or CHROME_PATH set to another Chromium (Brave).",
       "category": "design"
     }
   ]
