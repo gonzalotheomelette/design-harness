@@ -126,6 +126,12 @@ const readJson = (p, fallback) => {
 
 try {
   if (input.hook_event_name === 'UserPromptSubmit') {
+    // A message the app delivers, not the person: an agent's hand-back, a background task's notice, a note from another
+    // session. It continues the person's message rather than starting one. On 2026-11-09 a reviewer's hand-back reset
+    // the state here, so the change it had just reviewed was forgotten and the critic was never asked for.
+    const prompt = String(input.prompt ?? '')
+    const fromApp = /^\s*<(agent-message|task-notification|side-sessions-event|ci-monitor-event)\b/.test(prompt) || prompt.includes('[Subagent hand-back]')
+    if (fromApp && existsSync(statePath)) process.exit(0)
     const turnStart = snapshot(root, TREE)
     keepTree(root, 'turn', turnStart)
     // Work the last message left unreviewed (the cap was reached, the session stopped without the review, or this
@@ -288,6 +294,7 @@ function main() {
   // the tree is gone), fall back to the branch.
   const turnStart = treeExists(root, state.turnStart) ? state.turnStart : null
   if (turnStart && !changedSince(turnStart).length) process.exit(0)
+  const hadTurnStart = !!turnStart
 
   // A review asked for earlier in this message that has now reported is logged against the tree it was asked about,
   // whatever the session changed after it. Logging only when the state at the stop still matched left the range
@@ -314,6 +321,13 @@ function main() {
     .reverse()
     .find((t) => treeExists(root, t))
   const from = state.reviewed ? state.askedTree : (turnStart ?? lastTree ?? baseOf(root, config))
+  // A message with no snapshot of its start (the session's first message can reach the hook before it is installed)
+  // takes the range it was just measured from as its start, so the next message can carry its work instead of losing it.
+  if (!hadTurnStart && !state.reviewed) {
+    state.turnStart = from
+    keepTree(root, 'turn', from)
+    save()
+  }
   const carried = state.reviewed ? [] : (state.carried ?? []).filter((r) => treeExists(root, r.from) && treeExists(root, r.to))
   const carriedDiff = carried.map((r) => gitDiff(root, '--relative', r.from, r.to, '--', ...UI)).join('\n')
   const carriedFiles = carried.flatMap((r) => gitDiff(root, '--relative', '--name-only', r.from, r.to, '--', ...UI).split('\n').filter(Boolean))
