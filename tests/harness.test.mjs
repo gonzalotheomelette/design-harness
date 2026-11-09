@@ -1200,3 +1200,36 @@ test('a review run in the background counts once the app hands its report back, 
   writeFileSync(p3, [call3, launched, typed].map((e) => JSON.stringify(e)).join('\n'))
   assert.match(hook(typedRepo, 'Stop', { transcript_path: p3 }).out?.hookSpecificOutput?.additionalContext ?? '', /has not reported/, 'a token typed into the conversation is not a review')
 })
+
+// 2026-11-09, the retest of 0.18.1 in a website worktree session: the reviewer's hand-back reached the session as a
+// message, the hook took it for the person's next message and reset, and the critic was never asked for.
+const HANDBACK = '<agent-message from="a58e567d7dbfd9832">\n[Subagent hand-back] The text below is the final report of a subagent.\n  review-token: x'
+
+test('a hand-back the app delivers continues the message: the reviewed change still goes on to the critic', () => {
+  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  hook(dir, 'UserPromptSubmit', { prompt: 'make home less plain' })
+  write(dir, { 'src/pages/home.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  hook(dir, 'UserPromptSubmit', { prompt: HANDBACK })
+  assert.match(hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out?.hookSpecificOutput?.additionalContext ?? '', /design-harness:art-direction/)
+  // control: a message from the person does start a new message
+  const other = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  hook(other, 'UserPromptSubmit', { prompt: 'first' })
+  write(other, { 'src/pages/home.tsx': 'y\n' })
+  askFor(other)
+  hook(other, 'UserPromptSubmit', { prompt: 'something else now' })
+  const state = JSON.parse(readFileSync(join(gitDir(other), 'review-before-show.s1.json'), 'utf8'))
+  assert.equal(state.request, 'something else now')
+  assert.equal(state.carried.length, 1, 'the unreviewed work is carried into the new message')
+})
+
+test('work from a message the hook never saw start is carried, not lost', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  write(dir, { 'src/a.tsx': 'y\n' }) // no UserPromptSubmit: the hook was installed during this message
+  assert.match(askFor(dir), /ui-review/)
+  hook(dir, 'UserPromptSubmit', { prompt: 'next thing' })
+  write(dir, { 'src/b.tsx': 'z\n' }) // the next message changes something rendered, so its review reads the carried work too
+  const ctx = hook(dir, 'Stop').out?.hookSpecificOutput?.additionalContext ?? ''
+  assert.match(ctx, /ui-review/)
+  assert.ok(existsSync(join(packetDir(dir, fpOf(ctx)), 'carried.diff')), 'the earlier work reaches the reviewer as carried')
+})
