@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, r
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, globToRegExp, lineFlags, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
+import { DEFAULTS, globToRegExp, layoutFlags, lineFlags, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
 
 const HARNESS = join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins', 'design-harness')
 const HOOK = join(HARNESS, 'hooks', 'review-before-show.mjs')
@@ -924,6 +924,75 @@ test('the break check reads each block at three widths and names what reads badl
   assert.match(r.stdout, /4 text block\(s\) read across 1 page\(s\) at 3 widths, 1 bad break\(s\)/)
 })
 
+// Layout: the two corrections it was built from (Omelette's site, 2026-11-08), as the page measured them.
+
+test('the layout rules flag what ran off, what laid out two ways or wrapped alone, and a block a column off', () => {
+  const clean = { width: 1280, scrollWidth: 1280, overflow: [], groups: [], blocks: [] }
+  assert.deepEqual(layoutFlags(clean), [])
+  assert.match(layoutFlags({ ...clean, width: 360, scrollWidth: 420 }).join(), /scrolls sideways: it is 420px wide on a 360px screen/)
+  assert.match(layoutFlags({ ...clean, overflow: [{ name: 'div.oc-days', left: 16, right: 401 }] }).join(), /div\.oc-days runs past the right edge: it ends at 401px/)
+  // a box that fits, whose glued words run past the screen and are cut off (Inkwell, 2026-11-08)
+  assert.match(layoutFlags({ ...clean, width: 390, overflow: [{ name: 'div.c-st > p', left: 0, right: 422, text: 'Teams now get three times more done on creative tasks.' }] }).join(),
+    /div\.c-st > p: its text runs past the right edge to 422px on a 390px screen, where it is cut off: "Teams now get three times/)
+  // the release dots: dates under the dots of one day, beside the dots of three
+  const day = (stacked, left, top = 0) => ({ left, top, width: 100, height: 40, stacked, label: 'Nov 1' })
+  assert.match(layoutFlags({ ...clean, groups: [{ name: 'div.oc-days', items: [day(true, 0), day(false, 140), day(false, 240), day(false, 340)] }] }).join(),
+    /div\.oc-days: its 4 items lay out their parts two ways, 1 stacked and 3 side by side/)
+  assert.deepEqual(layoutFlags({ ...clean, groups: [{ name: 'div.oc-days', items: [day(true, 0), day(true, 140), day(true, 240), day(true, 340)] }] }), [])
+  // three on the first line and one alone under them
+  assert.match(layoutFlags({ ...clean, groups: [{ name: 'div.oc-days', items: [day(true, 0), day(true, 140), day(true, 240), day(true, 0, 70)] }] }).join(),
+    /its last item \("Nov 1"\) wraps onto a line of its own, under 3 on the first/)
+  assert.deepEqual(layoutFlags({ ...clean, groups: [{ name: 'ul', items: [day(true, 0), day(true, 140), day(true, 0, 70), day(true, 140, 70)] }] }), [], 'two even lines are a grid, not a stray')
+  // the FAQ on column 5 where three blocks share column 6
+  const block = (name, left) => ({ name, left, pitch: 103 })
+  const blocks = [block('div.t', 542), block('div.body', 542), block('div.tb', 542), block('div.faq', 439), block('h2', 24), block('div.wide', 748)]
+  const flags = layoutFlags({ ...clean, blocks })
+  assert.equal(flags.length, 1, flags.join('\n'))
+  assert.match(flags[0], /div\.faq starts at 439px; 3 other blocks on the page start at 542px, 1 column\(s\) away/)
+})
+
+test('the layout check measures each page at three widths and names what it found', () => {
+  const dir = repo({ 'src/a.tsx': 'x' })
+  write(dir, {
+    'node_modules/puppeteer/package.json': '{"name":"puppeteer","main":"index.js"}',
+    'node_modules/puppeteer/index.js': `module.exports = { launch: async () => ({
+      newPage: async () => { let w = 0; return {
+        setViewport: async (v) => { w = v.width }, emulateMediaFeatures: async () => {}, goto: async () => ({ status: () => 200 }),
+        evaluate: async () => ({ width: w, scrollWidth: w === 360 ? 401 : w, overflow: w === 360 ? [{ name: 'div.oc-days', left: 16, right: 401 }] : [], groups: [], blocks: [] }),
+        close: async () => {} } },
+      close: async () => {} }) }`,
+  })
+  const r = check(dir, 'check-layout.mjs', '/method')
+  assert.equal(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stdout, /\/method \[phone, 360px\] div\.oc-days runs past the right edge/)
+  assert.doesNotMatch(r.stdout, /\[desktop/)
+  assert.match(r.stdout, /1 page\(s\) measured at 3 widths, 2 layout problem\(s\)/)
+  assert.equal(check(dir, 'check-layout.mjs', 'https://example.com/').status, 2, 'only local pages are opened')
+})
+
+test('each screenshot is compared with the last capture of the same screen, and what changed is boxed', () => {
+  const dir = repo({ 'src/a.tsx': 'x' })
+  const fake = (changed) => ({
+    'node_modules/puppeteer/package.json': '{"name":"puppeteer","main":"index.js"}',
+    'node_modules/puppeteer/index.js': `module.exports = { launch: async () => ({
+      newPage: async () => ({
+        setViewport: async () => {}, emulateMediaFeatures: async () => {}, goto: async () => ({ status: () => 200 }),
+        evaluate: async (fn) => { const src = String(fn); if (src.includes('getImageData')) return ${changed ? "{ regions: [{ x: 16, y: 496, w: 368, h: 64 }], png: Buffer.from('boxed').toString('base64') }" : '{ regions: [], png: null }'}; if (src.includes('scrollHeight')) return 800; return 0 },
+        screenshot: async ({ path }) => require('fs').writeFileSync(path, 'png'), close: async () => {} }),
+      close: async () => {} }) }`,
+  })
+  write(dir, fake(true))
+  const first = check(dir, 'shoot.mjs', '/method', '--tiles=1')
+  assert.equal(first.status, 0, first.stdout + first.stderr)
+  assert.doesNotMatch(first.stdout, /changed since|unchanged/, 'nothing to compare with on the first capture')
+  const second = check(dir, 'shoot.mjs', '/method', '--tiles=1')
+  const boxed = second.stdout.match(/(\S+-changed\.png) {2}\(changed since the last capture, boxed: 368x64 at 16,496\)/)
+  assert.ok(boxed, second.stdout)
+  assert.equal(readFileSync(boxed[1], 'utf8'), 'boxed')
+  write(dir, fake(false))
+  assert.match(check(dir, 'shoot.mjs', '/method', '--tiles=1').stdout, /unchanged since the last capture/)
+})
+
 test('the reviewer runs on the latest Opus, and the benchmark records which Opus it last covered', () => {
   const agent = readFileSync(join(HARNESS, 'agents', 'ui-review.md'), 'utf8')
   assert.match(agent, /^model: opus$/m, 'the reviewer follows the latest Opus through the opus alias, not a pinned model')
@@ -957,6 +1026,7 @@ test('with the dev server up, the checks always run and screenshots only when th
   const off = await ask(false)
   assert.match(off, /check-a11y\.mjs/, off)
   assert.match(off, /check-breaks\.mjs/, off)
+  assert.match(off, /check-layout\.mjs/, off)
   assert.doesNotMatch(off, /shoot\.mjs/, off)
   assert.match(await ask(true), /shoot\.mjs \/<route> --at=/)
 })

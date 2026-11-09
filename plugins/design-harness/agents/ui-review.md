@@ -105,12 +105,17 @@ grep `DESIGN.md` and the rules file before flagging.
 ## 7. Look at it, and check accessibility
 
 `server.txt` says whether the dev server serves this checkout. When it does, the session puts the accessibility
-run and the line-break check in `browser.txt` before calling you, and screenshots when the project has switched them
-on (`screenshots` in the settings). Open every image it lists with Read and judge the picture, the changed surface
-beside its sibling: if a problem shows in a screenshot, it is real, whatever the code says.
-Report each serious or critical accessibility violation as a finding, and each bad line break the break check
+run, the line-break check and the layout check in `browser.txt` before calling you, and screenshots when the project
+has switched them on (`screenshots` in the settings). A picture listed with `-changed.png` is the new capture with
+what changed since the last one boxed in red: open those first and judge what moved, then the rest. Judge the
+changed surface beside its sibling: if a problem shows in a screenshot, it is real, whatever the code says. But do
+not trust your eye for alignment, spacing or overflow: the layout check measures those, and a picture read by eye
+missed every one of them on the benchmark.
+Report each serious or critical accessibility violation as a finding, each bad line break the break check
 names (a last line of one word, a line ending on a word that leans on the next, a sentence starting on a line's last
-word), with the width it happens at.
+word), with the width it happens at, and each problem the layout check names (something past the screen's edge,
+repeated items laid out two ways or one wrapping alone, a block a column off its siblings' edge), with its width.
+A layout flag can be a choice (a block set off on purpose): say so when the code or DESIGN.md shows it was chosen.
 
 When there is no `browser.txt`, say why in one line of your population (no server, or the session did not run the
 checks). Without pictures, spacing, colour matches and motion are not judged by anyone: say so for a change that
