@@ -969,7 +969,7 @@ const kickoffSettings = () => {
   return { skill, shared: blocks.find((b) => b.permissions), local: blocks.find((b) => b.extraKnownMarketplaces) }
 }
 
-test('the committed settings never register the private marketplace or its plugins', () => {
+test('the committed settings never register the designer\'s marketplace or its plugins', () => {
   const { shared, local } = kickoffSettings()
   assert.ok(shared, 'the kickoff names the committed settings')
   assert.equal(shared.extraKnownMarketplaces, undefined, 'settings.json is committed in a client repo')

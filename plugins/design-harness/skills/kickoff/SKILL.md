@@ -173,8 +173,8 @@ From `${CLAUDE_SKILL_DIR}/templates/`, and from the settings written out below:
   ```
 
 - `.claude/settings.local.json`, with `.claude/settings.local.json` added to `.gitignore` in the same step: merge in
-  the marketplace and the plugins, enabled on this machine only. The marketplace is private, so in the committed
-  settings it would ask a client's developers to install something they cannot reach. Write `ref` as `v` and the
+  the marketplace and the plugins, enabled on this machine only. The marketplace is the designer's tooling, so in the
+  committed settings it would ask a client's developers to install plugins their work does not need. Write `ref` as `v` and the
   `version` in `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`: the release running this kickoff. A later change
   to the harness then cannot change this project's behaviour until the tag is moved on purpose.
 

@@ -82,7 +82,7 @@ measurement, which is now `check-breaks.mjs`.
 
 3. Then, in Claude Code: `/design-harness:kickoff`, with or without a mood board. It writes `.claude/settings.local.json`,
    which keeps these plugins enabled on your machine only and stays out of git, so a client's developers are never
-   asked to install a marketplace they cannot reach.
+   asked to install the designer's tooling.
 
 ## What a project ends up with
 
