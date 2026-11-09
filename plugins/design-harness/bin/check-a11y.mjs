@@ -51,6 +51,7 @@ let runs = 0
 let passed = 0
 let unloaded = 0
 let blank = 0
+let unsure = 0
 try {
   for (const url of targets) {
     for (const colorScheme of config.modes ?? ['light', 'dark']) {
@@ -65,7 +66,7 @@ try {
           await page.close()
           continue
         }
-        const { violations, passes } = await page.axe(TAGS)
+        const { violations, passes, incomplete = [] } = await page.axe(TAGS)
         runs++
         // The population: a run that passed nothing checked nothing (a blank or still-loading page), which a
         // violation count of zero would otherwise report as clean.
@@ -78,6 +79,14 @@ try {
           if (v.impact === 'serious' || v.impact === 'critical') serious++
           console.log(`  ${url} [${colorScheme}, ${label}] ${v.impact} ${v.id}: ${v.help} (${v.nodes.length}x, first: ${v.nodes[0]?.target?.join(' ')})`)
         }
+        // Contrast axe could not decide: text over a gradient, an image or a translucent layer. Not a failure, but not a
+        // pass: on 2026-11-09 coral text on a Stone gradient (about 3:1) went unreported this way, and only a reviewer
+        // reading the CSS caught it. Named here so someone looks.
+        const undecided = incomplete.find((i) => i.id === 'color-contrast')
+        if (undecided) {
+          unsure += undecided.nodes.length
+          console.log(`  ${url} [${colorScheme}, ${label}] needs a look color-contrast: axe could not decide ${undecided.nodes.length} element(s), text over a gradient or image (first: ${undecided.nodes.slice(0, 3).map((n) => n.target?.join(' ')).join('; ')})`)
+        }
         await page.close()
       }
     }
@@ -85,7 +94,7 @@ try {
 } finally {
   await browser.close()
 }
-console.log(`a11y: ${targets.length} page(s), ${runs} page/mode/width runs with ${browser.kind}, ${passed} rule passes, ${serious} serious or critical`)
+console.log(`a11y: ${targets.length} page(s), ${runs} page/mode/width runs with ${browser.kind}${browser.shippedAxe ? ' and the harness\'s own axe' : ''}, ${passed} rule passes, ${serious} serious or critical${unsure ? `, ${unsure} contrast check(s) axe could not decide` : ''}`)
 if (serious) process.exit(1)
 // Any blank run is a page that was not checked, even when the others were.
 if (blank) {

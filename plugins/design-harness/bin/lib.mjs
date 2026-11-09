@@ -310,6 +310,28 @@ export function harnessTypescript() {
   }
 }
 
+// axe, shipped with the harness (as TypeScript is). The check used to need the project's own @axe-core/playwright or
+// @axe-core/puppeteer, and a site with neither (the Omelette website, 2026-11-09) never had its accessibility checked
+// in any review: the reviewer estimated contrast by reading CSS. Injected into the page when the project has no axe.
+const AXE_VERSION = '4.12.1'
+const AXE_SHA256 = '66a8aaa95a8b044a7fd74a5435873bf04ff65a1ca75567c921b7509742085a14'
+let axeSource
+export function harnessAxe() {
+  if (axeSource !== undefined) return axeSource
+  try {
+    const buf = gunzipSync(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'vendor', `axe-core-${AXE_VERSION}.min.js.gz`)))
+    axeSource = createHash('sha256').update(buf).digest('hex') === AXE_SHA256 ? buf.toString('utf8') : null
+  } catch {
+    axeSource = null
+  }
+  return axeSource
+}
+// Runs the shipped axe in a page: the WCAG tags only, so a finding is a failure, not advice. Returns axe's own result.
+const injectedAxe = async (addScript, evaluate, tags) => {
+  await addScript(harnessAxe())
+  return evaluate((t) => window.axe.run(document, { runOnly: { type: 'tag', values: t } }), tags)
+}
+
 // A package resolved from the PROJECT, not from the plugin: only the browser libraries, which the session runs.
 // A library from the project, at its root or in a package one folder down (a site in site/, an app in web/). On
 // 2026-11-09 the website kept Puppeteer in site/, so every browser check run from its root said NOT RUN, and the
@@ -360,7 +382,8 @@ export async function openBrowser(root, config) {
     const browser = await pw.chromium.launch()
     return {
       kind: 'playwright',
-      hasAxe: !!axeLib,
+      hasAxe: !!axeLib || !!harnessAxe(),
+      shippedAxe: !axeLib,
       async page({ colorScheme = 'light', viewport }) {
         // Reduced motion: a site that respects it shows every part in place, where an entrance waiting to be scrolled
         // to would leave a band of the screen empty.
@@ -379,7 +402,10 @@ export async function openBrowser(root, config) {
             return page.evaluate(() => Math.round(window.scrollY))
           },
           evaluate: (fn, arg) => page.evaluate(fn, arg),
-          axe: (tags) => new (axeLib.default ?? axeLib.AxeBuilder)({ page }).withTags(tags).analyze(),
+          axe: (tags) =>
+            axeLib
+              ? new (axeLib.default ?? axeLib.AxeBuilder)({ page }).withTags(tags).analyze()
+              : injectedAxe((content) => page.addScriptTag({ content }), (fn, arg) => page.evaluate(fn, arg), tags),
           close: () => page.close(),
         }
       },
@@ -398,7 +424,8 @@ export async function openBrowser(root, config) {
     }
     return {
       kind: 'puppeteer',
-      hasAxe: !!axeLib,
+      hasAxe: !!axeLib || !!harnessAxe(),
+      shippedAxe: !axeLib,
       async page({ colorScheme = 'light', viewport }) {
         const page = await browser.newPage()
         await page.setViewport(viewport)
@@ -415,7 +442,10 @@ export async function openBrowser(root, config) {
             return page.evaluate(() => Math.round(window.scrollY))
           },
           evaluate: (fn, arg) => page.evaluate(fn, arg),
-          axe: (tags) => new (axeLib.AxePuppeteer ?? axeLib.default)(page).withTags(tags).analyze(),
+          axe: (tags) =>
+            axeLib
+              ? new (axeLib.AxePuppeteer ?? axeLib.default)(page).withTags(tags).analyze()
+              : injectedAxe((content) => page.addScriptTag({ content }), (fn, arg) => page.evaluate(fn, arg), tags),
           close: () => page.close(),
         }
       },
