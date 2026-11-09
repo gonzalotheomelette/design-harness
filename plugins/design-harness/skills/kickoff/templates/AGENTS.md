@@ -15,6 +15,11 @@ For any coding agent (Claude Code, Codex, Cursor). Claude Code reads it through 
   **docs/open-questions.md** what is waiting on the client: when they exist, check both before treating anything
   as open.
 
+## Where design work runs
+
+Open the session for design work in this project's own folder. The design harness's review, art-direction critic and
+skills key off the session's folder, so work on this project from a session opened anywhere else gets none of them.
+
 ## Before building a surface
 
 1. Read what exists: search for the concept and open the closest existing surface. Never build a second version

@@ -9,8 +9,15 @@
   [Nutlope/hallmark](https://github.com/Nutlope/hallmark) (MIT) and Anthropic's frontend-design skill. It
   quotes none of them at length; each is credited in the file.
 - The marketplace lists, but does not copy, frontend-design (anthropics/claude-plugins-official), Impeccable,
-  modern-web-guidance (GoogleChrome, Apache-2.0) and emilkowalski/skills (MIT). Each installs from its own
+  modern-web-guidance (GoogleChrome, Apache-2.0), emilkowalski/skills (MIT) and Stageshow
+  (benjitaylor/skills, `stageshow/` MIT). Each installs from its own
   repository at the commit pinned in `.claude-plugin/marketplace.json`.
+- `plugins/design-harness/agents/art-direction.md` adapts three questions from the fresh-eye review in
+  [Stageshow](https://github.com/benjitaylor/skills/tree/main/stageshow) (MIT): whether the composition could be any
+  product in its category, the five ways a result goes plain, and the one difference beside the closest example.
+- `plugins/design-harness/skills/references/` records what a reference teaches as Trigger, Decision, Reason and
+  Evidence, an idea from [senlindesign/taste-skill](https://github.com/senlindesign/taste-skill); no text is taken
+  from it. The inspo MCP server ([Nutlope/inspo](https://github.com/Nutlope/inspo), MIT) is configured, not copied.
 - `plugins/design-harness/bin/vendor/typescript-6.0.3.js.gz` is Microsoft's TypeScript 6.0.3 (`lib/typescript.js`),
   Apache-2.0, gzipped and unmodified; its licence is beside it. The checks parse with it so they never load the
   project's own copy.
