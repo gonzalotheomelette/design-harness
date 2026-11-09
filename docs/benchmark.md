@@ -1,7 +1,7 @@
 # How well the reviewer works, and how it was measured
 
 Measured 2026-10-31 on two projects: a client prototype, where this harness was built, and Omelette's website, held out from
-it. Re-run it whenever the reviewer, its rules or its model change; `bench/` holds the scripts and prompts, and
+it, and again on 2026-11-08 with the reviewer on Opus. Re-run it whenever the reviewer, its rules or its model change; `bench/` holds the scripts and prompts, and
 `bench/README.md` the steps. The cases, answer keys, reports and scores quote the projects' code, so they are not in
 this tree; `bench/README.md` says how to restore them. A change that lowers the hit rate or raises the noise is a
 regression.
@@ -21,6 +21,50 @@ regression.
    the reports labelled P, Q, R, S with method names scrubbed. Per correction: HIT (same element, same direction of
    fix), PARTIAL (same element, other reason; or right reason, neighbouring element), MISS. Per report: total
    findings, and how many are not worth a designer's time.
+
+## 0.17.0 on Opus 5.5, both projects (2026-11-08)
+
+The question: since 0.16.0 the reviewer runs on the latest Opus, here `claude-opus-5-5`. Does it catch more than 0.7.0
+on Sonnet? The same 13 cases, code only (no dev server), three runs each: a fresh Opus agent given the reviewer's
+instructions as of 0.17.0 plus the AI-look register as refreshed on 2026-11-08, and a packet built as the hook builds it
+(with `settings.json`, and a `request.md` saying the request was not recorded). One Opus judge per case scored the
+reports against that case's corrections, fixed in advance rather than listed by the judge: the website's 21 from the
+0.12.1 round and the client prototype's 32 from the 0.7.0 round. On the website each judge also scored the three 0.7.0
+code-only reports, shuffled in with the new ones. It gave them 1.7 hits a run where the 0.12.1 round's judges gave 1.3,
+so it reads close to them. The client prototype's 0.7.0 reports were never kept, so there the comparison is with
+another judge's scores.
+
+| Project | Reviewer | Hits | Partial | Miss | Findings per review | Not worth the time |
+|---|---|---|---|---|---|---|
+| Website, held out (21 corrections) | 0.17.0 on Opus, runs 1, 2, 3 | 2, 5, 4 | 5, 6, 8 | 14, 10, 9 | 14.3 | 41% |
+| | 0.7.0 on Sonnet, same judge | 3, 1, 1 | 4, 5, 5 | 14, 15, 15 | 10.3 | 37% |
+| Client prototype (32) | 0.17.0 on Opus, runs 1, 2, 3 | 8, 12, 11 | 13, 8, 7 | 11, 12, 14 | 18.4 | 13% |
+| | 0.7.0 on Sonnet, the 0.7.0 judges | 11, 11, 14 | 9, 8, 8 | 12, 13, 10 | 12.6 | 13% |
+
+What it says:
+
+- **On the held-out website, two more hits a run**, 3.7 against 1.7 under the same judge, most of them on the kickoff
+  brief (5 hits over three runs against 1). Small, but larger than 0.7.0's own spread there.
+- **On the client prototype, no gain.** 10.3 against 12 is inside the three hits runs differ by, and the scores come
+  from different judges. The drop is one case: all three runs flagged a wordy row line and proposed cutting the other
+  half of it.
+- **It says more.** 18 findings a review on the client prototype against 13, and 14 against 10 on the website, at the
+  same share not worth the time on the client prototype and a little more on the website.
+- **It is slower.** The median review took 3.3 minutes (2.4 to 6.7), where Sonnet took 89 seconds in the first
+  comparison below. These stand-ins searched by reading files, which is slower than the plugin agent's Grep.
+- **The visual corrections are still missed:** 0.3 hits of the website's 7.
+- **Most partial hits are the right element with a softer fix.** Where the designer deleted, the reviewer rewrote: it
+  kept "Omelette Studio" on the founder label, demoted the draft banner instead of removing it, trimmed the review
+  step's copy instead of dropping the step, and kept the clause a notice's fix cut.
+
+By the rule above this is neither a gain nor a regression: the website moved by more than its spread and the client
+prototype did not move outside its own. Nothing here calls for pinning the reviewer back to an earlier model.
+
+How this run differed: it measures the model and the refreshed register together, so it cannot say which moved what;
+it did not also rerun Sonnet, so the comparison is with 0.7.0's stored reports and scores; the stand-in reviewers had
+Read but no Grep or Glob, and 5 of the 39 runs used a read-only shell search against their instructions; no packet
+carried the person's request. The reports and scores quote both projects' code, so they are not in this tree.
+`bench/scripts/make-judging-fixed.py` and `tally-fixed.py` build and total this round's judging.
 
 ## 0.12.1 with screenshots, on the held-out website (2026-11-01)
 

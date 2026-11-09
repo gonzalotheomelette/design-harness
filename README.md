@@ -30,12 +30,14 @@ makes after the review are read by the next one.
   a program on first use. A project that wants its audit commands installs it and enables it in its settings.
 
 How well the reviewer works is in [docs/benchmark.md](docs/benchmark.md), with its limits. In short, measured on
-0.7.0 with Sonnet as the reviewer (later versions changed its prompt, and since 0.16.0 it runs on the latest Opus; neither has been rerun), scored blind over three runs: it is a good copy reviewer and a weak visual one. On a client prototype's corrections, mostly wordy copy, it
+0.7.0 with Sonnet as the reviewer, scored blind over three runs: it is a good copy reviewer and a weak visual one. On a client prototype's corrections, mostly wordy copy, it
 caught 11 to 14 of 32 outright and 8 or 9 more in part, with one finding in eight not worth the time. On a
 held-out project whose corrections were mostly visual and product calls, with no dev server for pictures, it caught
 2 of 19 outright. Rerun on 0.12.1 with the dev server up (two judges, 95% agreement), the screenshots did not
 change that: the visual corrections were missed with and without them. What did catch one class, line breaks, was a
-measurement, which is now `check-breaks.mjs`.
+measurement, which is now `check-breaks.mjs`. Rerun on 0.17.0 with the reviewer on Opus 5.5, it caught 2 more of the
+held-out project's 21 corrections a run (3.7 against 1.7 under the same judge), none more on the client prototype,
+and wrote about 40% more findings, at a median 3.3 minutes a review.
 
 - **Product work in the same place.** A requirement per surface (`docs/product/`), a decision log and an open
   questions register sit beside the design files. The reviewer checks each surface against its requirement, so a

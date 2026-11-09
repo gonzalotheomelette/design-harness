@@ -24,5 +24,8 @@ const sep = ['--', ...UI] // the extra path arguments older runs took are no lon
 writeFileSync(join(out, 'change.diff'), `review-token: ${token}\n\n` + gitDiff(caseDir, '--relative', '--stat', base, head, ...sep) + '\n' + gitDiff(caseDir, '--relative', base, head, ...sep))
 writeFileSync(join(out, 'checks.txt'), run('node', [`${H}/bin/check-copy-length.mjs`, `--base=${base}`]) + '\n' + run('node', [`${H}/bin/check-drift.mjs`, `--base=${base}`]))
 writeFileSync(join(out, 'server.txt'), run('node', [`${H}/bin/server-of.mjs`]))
-writeFileSync(join(out, 'README.md'), [`# Review packet`, '', 'Start your report with the review-token line from the top of change.diff, exactly as written.', '', `- base: ${base}`, `- change.diff: the change, \`git diff ${base} ${head}\`, with its --stat on top`, '- checks.txt: copy length and drift on exactly this change, run by the hook', '- server.txt: whether the dev server serves this checkout', `- the AI-look register: ${H}/reference/ai-look.md`, ''].join('\n'))
+// A replayed commit has no recorded request, so request.md says what the hook writes in that case.
+writeFileSync(join(out, 'request.md'), '(not recorded: the hook was installed during this message)\n')
+writeFileSync(join(out, 'settings.json'), JSON.stringify(loadConfig(caseDir) ?? DEFAULTS, null, 2) + '\n')
+writeFileSync(join(out, 'README.md'), [`# Review packet`, '', 'Start your report with the review-token line from the top of change.diff, exactly as written.', '', `- base: ${base}`, `- change.diff: the change, \`git diff ${base} ${head}\`, with its --stat on top`, '- checks.txt: copy length and drift on exactly this change, run by the hook', '- request.md: what the person asked for this turn, in their own words', '- settings.json: the harness settings in effect', '- server.txt: whether the dev server serves this checkout', `- the AI-look register: ${H}/reference/ai-look.md`, ''].join('\n'))
 console.log(out, token)
