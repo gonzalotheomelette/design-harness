@@ -79,6 +79,15 @@ Not five differences: the one the designer would screenshot.
 
 ## 5. Directions
 
+When the packet names outside moves the designer picked (the direction skill's step 4), build your directions from
+those: you judge far better than you invent, and on 2026-11-09 the two directions you wrote from your own defaults
+(marks set in a title, a price at display size) were the ones you dropped once they were built. Without picks, take
+your structural ideas from the references and say so.
+
+When the packet's routes are built directions of the same page (`/page/?dir=<id>`), judge each one: whether it carries
+a point of view the page did not have, whether it blends with the site as it stands (or, for a new product, whether it
+is a real alternative), and what to change first. Then say which you would show, and drop the rest plainly.
+
 Two or three, each a different kind of answer, not three sizes of one idea. Make one of them the smallest move that
 changes how the page reads, and let one be bold. For each:
 

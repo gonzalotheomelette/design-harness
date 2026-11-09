@@ -1,57 +1,87 @@
 ---
 name: direction
-description: Asks the art-direction critic whether a page has a point of view, then puts its directions on the page behind switches so the designer chooses by looking, and records the choice. Use when a page or section is called basic, plain, generic, flat or unrefined, before a marketing or reading page is shown as finished, or when asked for directions, options, a bolder take or an art direction pass.
+description: Finds outside ideas for a page (wide for a new product, blended for an existing one), lets the designer pick the ones that pull before anything is built, builds directions from them behind switches on the real page, has the art-direction critic judge each, and records the choice. Use when a page or section is called basic, plain, generic, flat or unrefined, before a marketing or reading page is shown as finished, or when asked for directions, options, a bolder take or an art direction pass.
 ---
 
 # Direction
 
-The review loop catches slips; it cannot say a page is plain. This is the loop that can: compare the page with
-references the designer picked, ask a critic for directions, build them behind switches, let the designer choose
-on the page, and keep the choice so the next critique starts from it.
+The review loop catches slips; it cannot say a page is plain. This is the loop that can. Its order matters, and it
+comes from one day on the Omelette site (2026-11-09): with directions drawn only from the critic and the site's own
+pages, three rounds came back "very simple and questionable", "nothing really worth checking", and then a set the
+critic itself dropped once built (it judges far better than it invents). The designer's diagnosis: the harness was not
+looking outside. So ideas come from outside first, the designer picks before anything is built, and the critic filters.
 
-## 1. Make sure there is something to compare with
+## 1. Name the mode
 
-The critic judges against `design/references/`. When it holds nothing for this surface's pattern, **stop here**: ask
-the designer for three to five sites whose taste they trust and run the `references` skill on them. Do not build
-directions without them. A critique can run (the review-before-show hook asks for one after any change to a page that
-persuades or is read), but directions generated with no reference come from the model's own defaults, which is the
-look this exists to get away from: on 2026-11-09 two rounds of directions built that way were called "very simple and
-questionable".
+Ask nothing the project already answers.
 
-## 2. Prepare the packet
+- **Wide**: something new from scratch: no DESIGN.md yet, or the designer says the page is new. Go super wide:
+  candidates that could be radically different from each other, in structure, type, colour and motion. The kickoff's
+  mood-board round is this mode.
+- **Blend**: something that exists (a DESIGN.md and live surfaces). Outside ideas are welcome, and each one has to
+  blend in with what is already in place: take one structural move from it and say it in the project's own type,
+  colour, imagery and motion. A candidate whose idea only works in another brand's language is dropped, not toned down.
+
+The designer's words for the two, 2026-11-09: "if we are building something new from scratch, it is good to go super
+wide and explore different options that could be radically different", and "where there is something existing so the
+new ideas need to blend in nicely with whats already in place".
+
+## 2. Diagnose, briefly
+
+Build the packet for the page as it stands (step 6 shows the command) and ask the critic the first question only: what
+the page's category does by default, which of the five ways it goes plain, and its moment. That names what to look for
+outside. Its own directions are a starting point, not the menu.
+
+## 3. Search outside
+
+Always, in both modes, by **pattern class**, not feature ("a studio's process told as evidence", not "method page"):
+
+- the sites the designer names and the ones in `design/references/`, opened in the browser;
+- the designer's own bookmarks or competitors, when they share them (most will be the category's average: say so);
+- Mobbin (`search_sections`, `search_screens`) and inspo (`recommend`, `find_examples_for_macrostructure`,
+  `search_screens`) when connected. Briefs leave the machine: describe the pattern, never a client or anything under NDA.
+
+Keep 6 to 12. For each: the link, the **one structural move** it makes, and, in blend mode, **one line on how it would
+read in this project** (its type, its colour, its own patterns). Write down what you looked at and left, and why.
+
+## 4. Let the designer pick, before building
+
+Show the candidates as links with their one-line move and translation. A link is the live page; no mock-ups yet. Ask
+which pull, which repel, and why. Record the round in `design/picks.md` and the picks in `design/references/` (the
+`references` skill, step 4), in their words. This is the cheapest moment to be wrong; a built direction costs an
+hour and a critique.
+
+If the designer would rather react to built options than to links, say what that costs and build from your own top
+picks, naming each one's source.
+
+## 5. Build the directions behind switches
+
+Two or three directions, each from one picked move, each a different kind of answer. Build them on the real page,
+not as mock-ups: a small panel that turns each on, kept in the browser so it holds across pages, and nothing of it on
+the main branch or in a deploy (render it only when an environment flag is set). Each direction also opens by link,
+`?dir=<id>`, so the designer gets one live URL per direction and the packet can capture each one. Label invented copy
+in the panel, and name each direction's source there.
+
+Check every direction at desktop and phone width with the break, layout and accessibility checks, passing each
+`?dir=` route, before anyone judges it.
+
+## 6. Ask the critic, about each direction
 
 From the project root, with the dev server serving this checkout:
 
 ```
-node <harness>/bin/direction-packet.mjs --packet=<folder> /<route> [...] --said="<the designer's words about it>"
+node <harness>/bin/direction-packet.mjs --packet=<folder> /<route>?dir=<id> [...] --said="<the designer's words>"
 ```
 
-It takes the pictures a screen at a time at desktop and phone width and writes `README.md` with every picture by its
-full path, each page's mode read from PRODUCT.md's table, the references with what each teaches, and the paths of
-DESIGN.md, PRODUCT.md, `design/picks.md` and `docs/ui-consistency.md`. Never hand the critic a bare folder: three blind
-runs on 2026-11-09 had to guess file names, one never found the pictures, and a hand-written README called a Read
-page Persuade. When the hook asked for the critique, use the folder it named.
+One packet can hold every direction: each `?dir=` route gets its own pictures. Run the `design-harness:art-direction`
+agent with `packet: <folder>` (and the hook's `fingerprint:` when it asked), and tell it the mode and which source
+each direction came from.
 
-## 3. Ask the critic
+**Its verdict is shown first**, in its words, with what it would change, including "not ready to show". Drop what it
+drops. When you fix what it named, its verdict was on the earlier version: say so to the designer, or run it again.
+Never present work as finished on the strength of clean checks.
 
-Run the `design-harness:art-direction` agent in the foreground with `packet: <folder>` (and the hook's `fingerprint:`
-when it asked). It reads, it does not edit, and it answers with the five ways a page goes plain, the page's moment,
-the one difference beside the closest reference, two or three directions, and a verdict.
-
-**Its verdict is shown first.** When the critic says "not ready to show", the designer hears that before anything
-else, in its words, with what it would change. Never present work as finished on the strength of clean checks: the
-checks say a page is not broken, never that it is good.
-
-## 4. Put the directions on the page
-
-Show the critique in a few lines, then build the directions behind switches on the real page, not as mock-ups: a
-small panel that turns each on and off, kept in the browser so it holds across pages, and nothing of it on the main
-branch. Emil's `prototype` skill builds variants behind a picker when it is installed; otherwise a class on
-`<html>` per direction, with the direction's markup shown or hidden by it, is enough. Label invented copy in the
-panel. Check every direction at desktop and phone width with the layout and break checks before handing it over.
-Show it as a live URL.
-
-## 5. Record the choice
+## 7. Record the choice
 
 When the designer picks, add the round to `design/picks.md` (the learn skill's pick entry): what was shown, what
 was picked, what was left, in their words. Then build the pick properly on a branch, like any change: it goes
