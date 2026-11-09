@@ -83,6 +83,7 @@ settled so a playing loop is not a change.
 | The same pages after the fixes (05a319b) | Nothing |
 | A capture of Method's outcomes before, then after | The dots row boxed as changed, and the footer below it, which moved up because the row got shorter. A third, unchanged capture reported no change |
 | The website cases' introducing commits (W1, W2, W6, W7), nine page loads at three widths | Two flags, both the same two blocks on W6 and W7's home page a column off their neighbours; the designer kept both, so they are false alarms. The break check found 29 bad breaks on W6, as in the 0.12.1 round |
+| The live site's home, Work, five case pages, Services, Method and Privacy | First run: nothing. A reviewer reading the same pages then found a case statement cut off at the phone's edge: the paragraph's box fit its column while its words, glued with no-break spaces, ran past the screen, and the page clips there. The check now measures text too, and finds four such statements at 360 (SafeWay, Responsive AI, Inkwell, ICVR) and nothing else |
 
 What it says: **the layout check catches the class it was built for, and only that class.** None of the benchmark's
 eight visual-only corrections is an overflow, grouping or alignment slip, so it caught none of them. Sorted by what
@@ -91,8 +92,9 @@ other text-to-button gap is 28); one motion (two loops stacked on a phone); one 
 size from the titles); two state colours in one list; one the cursor's hover chrome; and one a colour inside a video,
 which no measurement of the page reaches. The next measurements, in the order these suggest: gaps between a text and
 its button against the page's own rhythm, playing animations per phone screen, and type settings of one role compared
-across the page. The two corrections it was built from are its only true positives so far, so it is unproven on new
-work until it catches a slip nobody has corrected yet.
+across the page. The two corrections it was built from were its only true positives until the live site's case pages, where text cut off
+at a phone's edge was a slip nobody had corrected yet; a reviewer saw it first, and the check measured its way to it
+once told where to look.
 
 ## 0.12.1 with screenshots, on the held-out website (2026-11-01)
 

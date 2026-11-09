@@ -100,6 +100,27 @@ function measureLayout() {
     }
   }
 
+  // text that runs past the edge inside a box that fits: words glued with no-break spaces make a phrase wider than its
+  // column, and a page that clips at the screen's edge simply cuts it off (Omelette's Inkwell case, 2026-11-08: "more
+  // done on creative tasks." ran to 422px on a 390px phone). Its block's own scroll width says so whatever is drawn.
+  const texts = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  while (texts.nextNode()) {
+    const t = texts.currentNode
+    if (!t.data.trim()) continue
+    let block = t.parentElement
+    while (block && getComputedStyle(block).display === 'inline') block = block.parentElement
+    if (!block || !shown(block) || [...reported].some((r) => r.contains(block)) || contained(block)) continue
+    if (block.scrollWidth <= block.clientWidth + 1) continue
+    if (/hidden|clip|auto|scroll/.test(getComputedStyle(block).overflowX)) continue // a line that crops itself, on purpose (a code line fading out)
+    const range = document.createRange()
+    range.selectNodeContents(t)
+    const right = Math.max(...[...range.getClientRects()].map((r) => r.right + window.scrollX))
+    if (right > width + 1) {
+      overflow.push({ name: name(block), left: 0, right: Math.round(right), text: t.data.trim().replace(/\s+/g, ' ').slice(0, 60) })
+      reported.add(block)
+    }
+  }
+
   const groups = []
   for (const el of all) {
     const d = getComputedStyle(el).display

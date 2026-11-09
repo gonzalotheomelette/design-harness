@@ -931,6 +931,9 @@ test('the layout rules flag what ran off, what laid out two ways or wrapped alon
   assert.deepEqual(layoutFlags(clean), [])
   assert.match(layoutFlags({ ...clean, width: 360, scrollWidth: 420 }).join(), /scrolls sideways: it is 420px wide on a 360px screen/)
   assert.match(layoutFlags({ ...clean, overflow: [{ name: 'div.oc-days', left: 16, right: 401 }] }).join(), /div\.oc-days runs past the right edge: it ends at 401px/)
+  // a box that fits, whose glued words run past the screen and are cut off (Inkwell, 2026-11-08)
+  assert.match(layoutFlags({ ...clean, width: 390, overflow: [{ name: 'div.c-st > p', left: 0, right: 422, text: 'Teams now get three times more done on creative tasks.' }] }).join(),
+    /div\.c-st > p: its text runs past the right edge to 422px on a 390px screen, where it is cut off: "Teams now get three times/)
   // the release dots: dates under the dots of one day, beside the dots of three
   const day = (stacked, left, top = 0) => ({ left, top, width: 100, height: 40, stacked, label: 'Nov 1' })
   assert.match(layoutFlags({ ...clean, groups: [{ name: 'div.oc-days', items: [day(true, 0), day(false, 140), day(false, 240), day(false, 340)] }] }).join(),

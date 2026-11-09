@@ -414,7 +414,7 @@ export function lineFlags(lines, lean = LEAN_WORDS) {
 
 // What a picture shows and a reviewer reading one misses, as numbers from the laid-out page (check-layout.mjs measures
 // it; this decides what to report, so the rules are tested without a browser). Three kinds:
-//   overflow   anything past the screen's edge, and a page that scrolls sideways
+//   overflow   anything past the screen's edge, a box's own text running past it, and a page that scrolls sideways
 //   groups     repeated siblings in a row (dates under their dots, cards in a strip): items that lay out their parts
 //              two different ways, and a last item that wraps onto a line of its own
 //   blocks     on a many-column grid, a text block that starts a column or so off the edge its siblings share
@@ -424,7 +424,13 @@ export function layoutFlags(m) {
   const flags = []
   if (m.scrollWidth > m.width + 1) flags.push(`the page scrolls sideways: it is ${m.scrollWidth}px wide on a ${m.width}px screen`)
   for (const o of m.overflow ?? [])
-    flags.push(o.left < -1 ? `${o.name} starts ${-o.left}px left of the screen` : `${o.name} runs past the right edge: it ends at ${o.right}px on a ${m.width}px screen`)
+    flags.push(
+      o.text
+        ? `${o.name}: its text runs past the right edge to ${o.right}px on a ${m.width}px screen, where it is cut off: "${o.text}"`
+        : o.left < -1
+          ? `${o.name} starts ${-o.left}px left of the screen`
+          : `${o.name} runs past the right edge: it ends at ${o.right}px on a ${m.width}px screen`,
+    )
   for (const g of m.groups ?? []) {
     const stacked = g.items.filter((i) => i.stacked === true).length
     const beside = g.items.filter((i) => i.stacked === false).length
