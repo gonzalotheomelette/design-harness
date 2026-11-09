@@ -126,7 +126,11 @@ let shots = 0
 let failed = 0
 try {
   for (const url of targets) {
-    const slug = new URL(url).pathname.replace(/\W+/g, '-').replace(/^-|-$/g, '') || 'home'
+    // The query is part of the name: two routes that differ only after the ? (a page's variants, /method/?dir=m1 and
+    // ?dir=m2) are different pictures. Named by the path alone they overwrote each other, and a direction packet of
+    // five variants handed the critic five copies of the last one (2026-11-09).
+    const { pathname, search } = new URL(url)
+    const slug = (pathname + search).replace(/\W+/g, '-').replace(/^-|-$/g, '') || 'home'
     for (const colorScheme of config.modes ?? ['light', 'dark']) {
       for (const [label, viewport] of [['desktop', { width: 1280, height: 900 }], ['phone', { width: 390, height: 844 }]]) {
         const page = await browser.page({ colorScheme, viewport })

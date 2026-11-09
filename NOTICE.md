@@ -21,3 +21,6 @@
 - `plugins/design-harness/bin/vendor/typescript-6.0.3.js.gz` is Microsoft's TypeScript 6.0.3 (`lib/typescript.js`),
   Apache-2.0, gzipped and unmodified; its licence is beside it. The checks parse with it so they never load the
   project's own copy.
+- `plugins/design-harness/bin/vendor/axe-core-4.12.1.min.js.gz` is Deque's axe-core 4.12.1 (`axe.min.js`), MPL-2.0,
+  gzipped and unmodified; its licence is beside it, and its source is at https://github.com/dequelabs/axe-core. The
+  accessibility check injects it when the project has no axe of its own.

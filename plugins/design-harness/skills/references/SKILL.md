@@ -22,7 +22,9 @@ month may already answer it.
 **The project's own best surfaces come first.** A site with an identity is its own strongest reference: the page the
 designer is proudest of, the pattern they chose over options, the case page or hero they keep pointing at. Name them
 before searching outside, and judge every outside candidate as "could this live beside those". Good design is not the
-bar; good design for this brand is. Six mocks of well-made studio and developer-tool pages, all "good designs but not
+bar; good design for this brand is. That is blend mode, for something that exists. For something new from scratch
+(wide mode, see the direction skill), go super wide instead: candidates that differ radically from each other are the
+point, and there is no brand yet to blend into. Six mocks of well-made studio and developer-tool pages, all "good designs but not
 in line with Omelette's website" (the designer, 2026-11-09), is what this rule comes from.
 
 ## 2. Search, in this order

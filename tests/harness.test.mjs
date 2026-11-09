@@ -1000,6 +1000,34 @@ test('the reviewer runs on the latest Opus, and the benchmark records which Opus
   assert.match(benched, /^(none|claude-opus-[a-z0-9-]+)$/, 'the weekly new-opus check compares against this file')
 })
 
+test('a dev server run from a subfolder serves this checkout; one in a nested worktree does not', async () => {
+  // 2026-11-09: a site whose server runs from site/ (cd site && astro dev) was told "no" for its own checkout.
+  const ask = async (cwdOf) => {
+    const port = 4400 + Math.floor(Math.random() * 500)
+    const dir = repo({ 'site/a.tsx': 'x\n' }, { ui: ['site/**/*.tsx'], devServer: `http://localhost:${port}` })
+    const cwd = cwdOf(dir)
+    mkdirSync(cwd, { recursive: true })
+    const server = spawn(process.execPath, ['-e', `require('node:http').createServer((q, s) => s.end('ok')).listen(${port}, '127.0.0.1')`], { cwd, stdio: 'ignore' })
+    try {
+      let out = ''
+      for (let i = 0; i < 50 && !/: (yes|no) /.test(out); i++) {
+        out = check(dir, 'server-of.mjs').stdout
+        if (!/: (yes|no) /.test(out)) await new Promise((r) => setTimeout(r, 100))
+      }
+      return out
+    } finally {
+      server.kill()
+    }
+  }
+  assert.match(await ask((dir) => join(dir, 'site')), /serves this checkout: yes/)
+  const nested = await ask((dir) => {
+    const wt = join(dir, '.claude', 'worktrees', 'other')
+    execFileSync('git', ['-C', dir, 'worktree', 'add', '-q', '--detach', wt], { stdio: 'ignore' })
+    return wt
+  })
+  assert.match(nested, /serves this checkout: no/)
+})
+
 test('with the dev server up, the checks always run and screenshots only when the project opts in', async () => {
   const ask = async (screenshots) => {
     const port = 4400 + Math.floor(Math.random() * 500)
@@ -1095,6 +1123,23 @@ test('a change to an art-directed page is held for the critic after the reviewer
   const forged = criticReported(dir, fp, reported(dir, fp), 'toolu_F', 'deadbeefdeadbeef')
   assert.match(hook(dir, 'Stop', { transcript_path: forged, stop_hook_active: true }).out?.hookSpecificOutput?.additionalContext ?? '', /did not open its packet/)
   assert.equal(hook(dir, 'Stop', { transcript_path: criticReported(dir, fp, reported(dir, fp)) }).out, null, 'the critique with the token ends it')
+})
+
+test('a fix after the critic tells the person its verdict was on the earlier version, once', () => {
+  // 2026-11-09: a session fixed both pages after a "not ready to show" and handed them over as if they had been judged.
+  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+  hook(dir, 'UserPromptSubmit', { prompt: 'make the home page less plain' })
+  write(dir, { 'src/pages/home.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  hook(dir, 'Stop', { transcript_path: reported(dir, fp) })
+  const both = criticReported(dir, fp, reported(dir, fp))
+  assert.equal(hook(dir, 'Stop', { transcript_path: both }).out, null, 'the critique ends the gate')
+  write(dir, { 'src/pages/home.tsx': 'z\n' })
+  const out = hook(dir, 'Stop', { transcript_path: both }).out
+  assert.match(out?.systemMessage ?? '', /critic's verdict was on the version before the latest fixes/)
+  assert.match(out?.hookSpecificOutput?.additionalContext ?? '', /verdict was on the earlier version/)
+  write(dir, { 'src/pages/home.tsx': 'zz\n' })
+  assert.doesNotMatch(hook(dir, 'Stop', { transcript_path: both }).out?.systemMessage ?? '', /critic's verdict/, 'said once a message')
 })
 
 test('a change outside the art-directed pages gets the reviewer only', () => {

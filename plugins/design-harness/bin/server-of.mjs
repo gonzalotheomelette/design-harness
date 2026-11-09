@@ -10,6 +10,7 @@
  */
 import { execFileSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
+import { sep } from 'node:path'
 import { DEFAULTS, loadConfig } from './lib.mjs'
 
 const root = realpathSync(process.cwd())
@@ -34,7 +35,16 @@ for (const pid of pids) {
   try {
     real = realpathSync(cwd)
   } catch {}
-  if (real === root) {
+  // A server started in a subfolder of this checkout (`cd site && astro dev`) still serves it: the site that found
+  // this ran its dev server from site/, and this answered "no" for the right checkout (2026-11-09). A folder inside
+  // the root can still be another checkout (a worktree under .claude/worktrees/), so the folder's git top level must
+  // be this root too.
+  const top = real && sh('git', '-C', real, 'rev-parse', '--show-toplevel')
+  let topReal = top
+  try {
+    topReal = realpathSync(top)
+  } catch {}
+  if (real === root || (real?.startsWith(root + sep) && topReal === root)) {
     console.log(`serves this checkout: yes (${config.devServer}, pid ${pid})`)
     process.exit(0)
   }

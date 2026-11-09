@@ -363,6 +363,25 @@ function main() {
           ? `Review before show: ${created.length} rendered file(s) created after this message's review were not reviewed (${created.slice(0, 5).join(', ')}); the next review reads them.`
           : null
       if (note) state.notedCreated = true
+      // The critic judged the page before these fixes. Said once, so the person never takes its verdict for one on the
+      // version they are shown (2026-11-09: a session fixed three pages after a "not ready to show" and handed them over
+      // as if the critic had passed them).
+      const tasteNote =
+        state.tasteDone && !state.notedTaste
+          ? `Art direction: the critic's verdict was on the version before the latest fixes (${changedSince(state.askedTree).slice(0, 5).join(', ')}); it has not seen this one.`
+          : null
+      if (tasteNote) state.notedTaste = true
+      // The browser checks (line breaks, layout, accessibility) read the page, so only the session can run them on the
+      // routes these fixes reach. Asked for once a message: before, fixes after the review were read by the copy and
+      // drift checks only, and a phone layout the reviewer never saw went to the person unmeasured (2026-11-09).
+      let measure = null
+      if (!state.fixMeasured && /: yes/.test(runCheck('server-of.mjs').out)) {
+        state.fixMeasured = true
+        measure =
+          `The fixes after this message's review have not been measured in a browser. Run ` +
+          `\`node ${HARNESS}/bin/check-breaks.mjs\`, \`check-layout.mjs\` and \`check-a11y.mjs\` (same folder) on the pages they render, ` +
+          `fix what they flag in what this turn built, and tell the person what stays and why.`
+      }
       let found = []
       if ((state.fixChecks ?? 0) < 2) {
         state.fixChecks = (state.fixChecks ?? 0) + 1
@@ -372,20 +391,17 @@ function main() {
           .flatMap((r) => r.out.split('\n').filter((l) => /^ {2}\S/.test(l)))
       }
       save()
-      if (!found.length && !note) process.exit(0)
+      const told = [note, tasteNote].filter(Boolean).join(' ')
+      const asks = [
+        ...(found.length ? [`The work after the review added these, which the checks flag:\n${found.slice(0, 12).join('\n')}\nFix them, or tell the person why they stay.`] : []),
+        ...(measure ? [measure] : []),
+        ...(tasteNote ? ["Tell the person, before anything else about this work, that the critic's verdict was on the earlier version."] : []),
+      ]
+      if (!asks.length && !told) process.exit(0)
       process.stdout.write(
         JSON.stringify({
-          ...(note ? { systemMessage: note } : {}),
-          ...(found.length
-            ? {
-                hookSpecificOutput: {
-                  hookEventName: 'Stop',
-                  additionalContext:
-                    `The work after the review added these, which the checks flag:\n${found.slice(0, 12).join('\n')}\n` +
-                    `Fix them, or tell the person why they stay.`,
-                },
-              }
-            : {}),
+          ...(told ? { systemMessage: told } : {}),
+          ...(asks.length ? { hookSpecificOutput: { hookEventName: 'Stop', additionalContext: asks.join('\n\n') } } : {}),
         }),
       )
       process.exit(0)
