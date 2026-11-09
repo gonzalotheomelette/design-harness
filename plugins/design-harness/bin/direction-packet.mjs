@@ -58,7 +58,10 @@ if (!taken.length) {
 const productPath = join(root, config.product)
 const product = existsSync(productPath) ? readFileSync(productPath, 'utf8').split('\n') : []
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const modeOf = (route) => {
+const modeOf = (withQuery) => {
+  // PRODUCT.md names pages by path; a variant of a page (/method/?dir=m3) is still that page (2026-11-09: it was
+  // reported as "not named in PRODUCT.md", and the critic had to correct its own packet)
+  const route = withQuery.split(/[?#]/)[0]
   for (const row of product.filter((r) => r.trim().startsWith('|'))) {
     const named = [...row.matchAll(/`([^`]+)`/g)].map((m) => m[1])
     const hit = named.some((n) => new RegExp(`^${n.split(/<[^>]+>/).map(esc).join('[^/]+')}$`).test(route))
