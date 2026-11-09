@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, r
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { globToRegExp, lineFlags, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
+import { DEFAULTS, globToRegExp, lineFlags, localTargets, matchesAny, pageTargets } from '../plugins/design-harness/bin/lib.mjs'
 
 const HARNESS = join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins', 'design-harness')
 const HOOK = join(HARNESS, 'hooks', 'review-before-show.mjs')
@@ -961,21 +961,37 @@ test('with the dev server up, the checks always run and screenshots only when th
   assert.match(await ask(true), /shoot\.mjs \/<route> --at=/)
 })
 
-test('the committed settings template never registers the private marketplace or its plugins', () => {
-  const templates = join(HARNESS, 'skills', 'kickoff', 'templates')
-  const shared = JSON.parse(readFileSync(join(templates, 'settings.json'), 'utf8'))
+// The kickoff writes the two Claude Code settings files from JSON blocks in its own instructions (no template files since
+// Nov 8 2026): the block with permissions is the committed one, the block with the marketplace the machine-only one
+const kickoffSettings = () => {
+  const skill = readFileSync(join(HARNESS, 'skills', 'kickoff', 'SKILL.md'), 'utf8')
+  const blocks = [...skill.matchAll(/```json\n([\s\S]*?)```/g)].map((m) => JSON.parse(m[1]))
+  return { skill, shared: blocks.find((b) => b.permissions), local: blocks.find((b) => b.extraKnownMarketplaces) }
+}
+
+test('the committed settings never register the private marketplace or its plugins', () => {
+  const { shared, local } = kickoffSettings()
+  assert.ok(shared, 'the kickoff names the committed settings')
   assert.equal(shared.extraKnownMarketplaces, undefined, 'settings.json is committed in a client repo')
   assert.equal(shared.enabledPlugins, undefined, 'settings.json is committed in a client repo')
-  const local = JSON.parse(readFileSync(join(templates, 'settings.local.json'), 'utf8'))
-  assert.ok(local.extraKnownMarketplaces?.omelette, 'the marketplace belongs in settings.local.json')
+  assert.ok(local?.extraKnownMarketplaces?.omelette, 'the marketplace belongs in settings.local.json')
   assert.ok(local.enabledPlugins?.['design-harness@omelette'], 'the plugins belong in settings.local.json')
 })
 
-test('both manifests and the kickoff template name the same release', () => {
+test('both manifests name the same release, and the kickoff pins the release that runs it', () => {
   const read = (...p) => JSON.parse(readFileSync(join(HARNESS, ...p), 'utf8'))
   const plugin = read('.claude-plugin', 'plugin.json').version
   const listed = read('..', '..', '.claude-plugin', 'marketplace.json').plugins.find((p) => p.name === 'design-harness').version
-  const ref = read('skills', 'kickoff', 'templates', 'settings.local.json').extraKnownMarketplaces.omelette.source.ref
   assert.equal(listed, plugin, 'marketplace.json and plugin.json disagree')
-  assert.equal(ref, `v${plugin}`, 'the kickoff would pin projects to a different release than this one')
+  const { skill, local } = kickoffSettings()
+  assert.equal(local.extraKnownMarketplaces.omelette.source.ref, 'v<version>', 'a release typed into the kickoff goes stale on the next release')
+  assert.match(skill, /\$\{CLAUDE_PLUGIN_ROOT\}\/\.claude-plugin\/plugin\.json/, 'the kickoff must say where the version comes from')
+})
+
+test('the kickoff\'s project settings leave the file lists to the defaults', () => {
+  // A ui or themeFiles key in the template replaces the defaults; a narrower copy once left .astro, .vue and .svelte unreviewed
+  const template = JSON.parse(readFileSync(join(HARNESS, 'skills', 'kickoff', 'templates', 'design-harness.json'), 'utf8'))
+  assert.equal(template.ui, undefined)
+  assert.equal(template.themeFiles, undefined)
+  for (const ext of ['tsx', 'jsx', 'vue', 'svelte', 'astro', 'html', 'css']) assert.ok(DEFAULTS.ui.includes(`**/*.${ext}`), ext)
 })

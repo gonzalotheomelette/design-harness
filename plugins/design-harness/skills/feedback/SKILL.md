@@ -10,7 +10,8 @@ truth; their documents are where the conversation happens. This loop moves each 
 repo, and each answer from the repo back to their place, without losing one or answering one twice.
 
 The records it writes: `docs/decision-log.md`, `docs/open-questions.md`, and `docs/product/<surface>.md`
-(paths in `.claude/design-harness.json`). Create them from the kickoff templates if they are missing.
+(paths in `.claude/design-harness.json`). Create each the first time it is needed: the log and the questions from
+`${CLAUDE_SKILL_DIR}/templates/`, a requirement from `${CLAUDE_PLUGIN_ROOT}/skills/kickoff/templates/requirement.md`.
 
 ## 1. Read everything, from the source
 

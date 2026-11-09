@@ -80,12 +80,12 @@ Write the answers down; they go into PRODUCT.md.
 
 ## 3. Write PRODUCT.md
 
-From `templates/PRODUCT.md` in this skill's folder: audience, use scene, surfaces and their modes, voice (with
+From `${CLAUDE_SKILL_DIR}/templates/PRODUCT.md`: audience, use scene, surfaces and their modes, voice (with
 three example strings in it and three it would never say), the forcing answers, and what is out of scope.
 
 ## 4. Write DESIGN.md, in two passes
 
-Use Google's DESIGN.md format (`templates/DESIGN.md`): tokens in YAML front matter, rationale in prose, sections in
+Use Google's DESIGN.md format (`${CLAUDE_SKILL_DIR}/templates/DESIGN.md`): tokens in YAML front matter, rationale in prose, sections in
 the spec's order (Overview, Colors, Typography, Layout, Elevation & Depth, Shapes, Components, Do's and Don'ts),
 then this harness's extra sections (Iconography, Imagery, Motion, Chosen on purpose, Signature move).
 
@@ -93,7 +93,7 @@ then this harness's extra sections (Iconography, Imagery, Motion, Chosen on purp
 tier per object size, spacing scale, the layout concept, and the one signature move. Derive them from the mood
 board and the use scene, not from habit.
 
-**Second pass, against the defaults.** Read `../../reference/ai-look.md` (from this skill's folder), which distils
+**Second pass, against the defaults.** Read `${CLAUDE_PLUGIN_ROOT}/reference/ai-look.md`, which distils
 the generated looks the external skills list, and the frontend-design skill's own list when that plugin is installed. For every choice that is a default rather than a decision for this
 brief (cream and terracotta, the SaaS card kit, an eyebrow above every heading, a near-black ground with one neon
 accent), revise it and say what changed and why. Anything from that list the brief genuinely calls for goes under
@@ -147,35 +147,61 @@ Claude Code protects the `.claude/` folder, so writing the three files there ask
 and a headless run cannot write them at all (the 2026-10-31 dry run stopped exactly there). Say what the three files
 do when asking.
 
-Copy from `templates/`:
+From `${CLAUDE_SKILL_DIR}/templates/`, and from the settings written out below:
 
-- `design-harness.json` to `.claude/design-harness.json`, with `ui`, `themeFiles` and `devServer` set for this stack,
-  and `modes` listing the colour modes the product ships. The template starts with `light` alone: add `dark` once
-  DESIGN.md defines the dark twin of every colour token, so nothing is screenshotted or checked in a mode it has no
-  palette for. `screenshots` stays `false`: the accessibility and line-break checks run whenever the dev server is
-up, but screenshots in every review cost minutes and, measured, caught nothing more; turn them on for a project
-where layout is the work. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. `themeFiles`
-  are globs: make sure one matches wherever step 5 wrote the theme. Commit the file: the harness reads its settings
-  from the last commit, so a change cannot loosen them on the way through.
+- `design-harness.json` to `.claude/design-harness.json`. It holds only what differs per project: `devServer`, and
+  `modes`, the colour modes the product ships. The template starts with `light` alone: add `dark` once DESIGN.md
+  defines the dark twin of every colour token, so nothing is screenshotted or checked in a mode it has no palette
+  for. Everything else comes from the harness's defaults (`${CLAUDE_PLUGIN_ROOT}/bin/lib.mjs`), which already cover
+  every common UI file type (`.tsx`, `.jsx`, `.vue`, `.svelte`, `.astro`, `.html` and the stylesheets) and the usual
+  theme files, step 5's `theme.css` among them. Add `ui` or `themeFiles` only when this stack keeps its UI or its
+  theme somewhere the defaults miss, and then list the whole set: a key here replaces the default, it does not add to
+  it. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. Screenshots stay off: the
+  accessibility and line-break checks run whenever the dev server is up, but screenshots in every review cost
+  minutes and, measured, caught nothing more; add `"screenshots": true` for a project where layout is the work.
+  Commit the file: the harness reads its settings from the last commit, so a change cannot loosen them on the way
+  through.
 - A project tool that takes screenshots as a signed-in persona, or a browser outside the usual places, goes in
   `.claude/design-harness.local.json` as `screenshot` (a command, `{route}` where the path goes) or `browserPath`, and
   that file goes in `.gitignore`. The harness reads these two only from that file and only while git does not track
   it, so a repository someone clones can never hand the session a command to run.
-- `settings.json` merged into `.claude/settings.json`, committed: it allows the pinned DESIGN.md linter and nothing
-  else, so it is safe for anyone who clones the repo.
-- `settings.local.json` merged into `.claude/settings.local.json`, with `.claude/settings.local.json` added to
-  `.gitignore` in the same step: it registers the omelette marketplace and enables the plugins on this machine only.
-  The marketplace is private, so in the committed settings it would ask a client's developers to install something
-  they cannot reach. Its `ref` pins the harness to the release tag current at kickoff, so a later change to the
-  harness cannot change this project's behaviour until the tag is moved on purpose.
-- `ui-consistency.md` to `docs/ui-consistency.md`. It starts nearly empty on purpose: it fills with the person's
-  corrections through `/design-harness:learn`.
-- `decision-log.md` and `open-questions.md` to `docs/`, and `requirement.md` as the pattern for
-  `docs/product/<surface>.md`. Product work happens here, in tandem with design: write a surface's requirement
-  before building it, record each decision with its date and who made it, and keep client questions in one place.
-  Client-facing versions go to Google Docs or Claude Docs for comments; answers come back into these files.
+- `.claude/settings.json`, committed: merge in this one rule and nothing else, so it is safe for anyone who clones
+  the repo.
+
+  ```json
+  { "permissions": { "allow": ["Bash(npx -y @google/design.md@0.4.0 *)"] } }
+  ```
+
+- `.claude/settings.local.json`, with `.claude/settings.local.json` added to `.gitignore` in the same step: merge in
+  the marketplace and the plugins, enabled on this machine only. The marketplace is private, so in the committed
+  settings it would ask a client's developers to install something they cannot reach. Write `ref` as `v` and the
+  `version` in `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`: the release running this kickoff. A later change
+  to the harness then cannot change this project's behaviour until the tag is moved on purpose.
+
+  ```json
+  {
+    "extraKnownMarketplaces": {
+      "omelette": { "source": { "source": "github", "repo": "gonzalotheomelette/design-harness", "ref": "v<version>" } }
+    },
+    "enabledPlugins": {
+      "design-harness@omelette": true,
+      "frontend-design@omelette": true,
+      "modern-web-guidance@omelette": true,
+      "emil-design-engineering@omelette": true
+    }
+  }
+  ```
+
+- `ui-consistency.md` to `docs/ui-consistency.md`. It starts empty on purpose: it fills with the person's
+  corrections through `/design-harness:learn`, which adds each heading the first time a rule needs one.
+- `requirement.md` as the pattern for `docs/product/<surface>.md`. Product work happens here, in tandem with design:
+  write a surface's requirement before building it. The decision log and the open questions belong to the feedback
+  skill, which creates each the first time a decision or a client question is recorded, so a new project does not
+  open on empty paperwork.
 - `AGENTS.md` to the project root (what any coding agent must know), and `CLAUDE.md` beside it, which imports it and
-  stays under 200 lines.
+  stays under 200 lines. When the project already has either file, merge rather than replace: keep what is there,
+  add the harness's sections, and put the `@AGENTS.md` import at the top of an existing CLAUDE.md. Claude Code reads
+  AGENTS.md on its own only when there is no CLAUDE.md, so the import is what keeps one shared file.
 
 The copy and drift checks need nothing installed: they parse with the TypeScript that ships with the harness. If the
 person has not installed the external plugins yet (the README installs them before the kickoff), tell them each needs
