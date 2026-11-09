@@ -218,7 +218,9 @@ function reviewOf(fingerprint, agent = 'design-harness:ui-review', kind = 'revie
       completed = true
       if (token && String(e.origin.handbackReportText ?? '').includes(`review-token: ${token}`)) return { called: true, reported: true }
     }
-  return { called: true, reported: false, unread: completed }
+  // Launched in the background and not back yet: the agent is still working. A session that can only run agents that
+  // way waits by ending its turn, and the hand-back starts the next one.
+  return { called: true, reported: false, unread: completed, running: launched.size > 0 && !completed }
 }
 
 // The packet the reviewer reads instead of running anything: the change, the checks on it, and the server's state.
@@ -333,6 +335,10 @@ function main() {
   const carriedFiles = carried.flatMap((r) => gitDiff(root, '--relative', '--name-only', r.from, r.to, '--', ...UI).split('\n').filter(Boolean))
   const files = [...new Set([...changedSince(from), ...carriedFiles])]
   if (!files.length) process.exit(0)
+  // Files put back the way the branch found them (a revert, a probe undone) leave nothing to review. Compared with the
+  // branch's base, not HEAD, so committing a change can never stand in for reviewing it. On 2026-11-09 reverting a
+  // one-line test comment cost a second reviewer and a second critique.
+  if (!gitDiff(root, '--relative', '--name-only', baseOf(root, config), now, '--', ...files).trim()) process.exit(0)
 
   // Fixes the session made after this message's review. The next review reads them in full; before this turn ends,
   // the copy and drift checks read them once, so a fix that adds a long string or a raw value is not handed over.
@@ -400,6 +406,10 @@ function main() {
     process.exit(0)
   }
   const pending = review.called || (input.background_tasks ?? []).some((t) => /ui-review/.test(JSON.stringify(t)))
+  // The review asked for is running in the background: let the turn end quietly and look again when its hand-back
+  // arrives. Asking again here, then giving up with "was not reviewed", told the person on 2026-11-09 that a review had
+  // not happened while it was a minute from reporting.
+  if (review.running && state.lastBlocked === fingerprint) process.exit(0)
 
   const say = (systemMessage) => process.stdout.write(JSON.stringify({ systemMessage }))
   // Asking again for a review that is still running is the same request, not a new review, so it does not spend the
@@ -477,6 +487,9 @@ function tasteStep(state, save) {
     return false
   }
   const pending = critic.called || (input.background_tasks ?? []).some((t) => /art-direction/.test(JSON.stringify(t)))
+  // Still running in the background: end the turn quietly and look again at the hand-back, rather than ask again and
+  // then tell the person "the critic did not report" while it is still reading (2026-11-09).
+  if (critic.running && state.tasteAsked === fp) return true
   const list = (state.tasteFiles ?? []).slice(0, 8).join(', ')
   if (state.tasteAsked === fp) {
     if (pending && !state.tasteRechased) {
