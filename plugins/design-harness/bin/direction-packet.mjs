@@ -33,7 +33,9 @@ const pics = join(packet, 'pictures')
 mkdirSync(pics, { recursive: true })
 
 // The pictures, a screen at a time, by the harness's own screenshot script; its output names every file it wrote.
-const shot = spawnSync('node', [join(BIN, 'shoot.mjs'), ...routes, `--tiles=${arg('tiles') || 4}`], { cwd: root, encoding: 'utf8', timeout: 240000 })
+// Enough screens to reach the bottom of a long page: at 4 a Services packet stopped two-thirds down on a phone, and
+// the critic could not judge the FAQ, the close or the footer (2026-11-09). A page longer still says so below.
+const shot = spawnSync('node', [join(BIN, 'shoot.mjs'), ...routes, `--tiles=${arg('tiles') || 12}`], { cwd: root, encoding: 'utf8', timeout: 300000 })
 const lines = (shot.stdout ?? '').split('\n')
 const taken = []
 for (const l of lines) {
@@ -43,7 +45,7 @@ for (const l of lines) {
   copyFileSync(m[1], join(pics, name))
   taken.push({ path: join(pics, name), what: m[2] })
 }
-const failed = lines.filter((l) => /could not load|NOT RUN/.test(l)).map((l) => l.trim())
+const failed = lines.filter((l) => /could not load|NOT RUN|more slice/.test(l)).map((l) => l.trim())
 if (!taken.length) {
   console.log(`direction-packet: NOT RUN. No picture was taken${failed.length ? `: ${failed.join('; ')}` : ' (is the dev server serving this checkout?)'}`)
   process.exit(2)

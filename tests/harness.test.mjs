@@ -1147,3 +1147,56 @@ test('a browser library in a package one folder down is found, so the checks run
   assert.equal(projectRequire(dir, 'fake-browser')?.found, true, 'found from the root')
   assert.equal(projectRequire(dir, 'not-installed-anywhere'), null)
 })
+
+test('in a worktree session the hook reads the worktree, not the main checkout the project folder names', () => {
+  const main = repo({ 'src/a.tsx': 'x\n' })
+  const wt = `${main}-wt`
+  execFileSync('git', ['worktree', 'add', '-q', '-b', 'wt', wt], { cwd: main, stdio: 'ignore' })
+  // control: the main checkout changes nothing, so a session there is left alone
+  hook(main, 'UserPromptSubmit', { session_id: 'm1' })
+  assert.equal(hook(main, 'Stop', { session_id: 'm1' }).out, null)
+  // the desktop app sets CLAUDE_PROJECT_DIR to the main checkout; the session works in the worktree
+  hook(main, 'UserPromptSubmit', { cwd: wt, session_id: 'w1' })
+  write(wt, { 'src/a.tsx': 'y\n' })
+  const ctx = hook(main, 'Stop', { cwd: wt, session_id: 'w1' }).out?.hookSpecificOutput?.additionalContext ?? ''
+  assert.match(ctx, /ui-review/)
+  assert.match(ctx, /src\/a\.tsx/)
+  assert.ok(ctx.includes(join('.git', 'worktrees')), 'the packet lives in the worktree\'s own git folder')
+})
+
+test('a review run in the background counts once the app hands its report back, and only from the agent it started', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  hook(dir, 'UserPromptSubmit')
+  write(dir, { 'src/a.tsx': 'y\n' })
+  const fp = fpOf(askFor(dir))
+  const token = tokenOf(dir, fp)
+  const call = { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_B', name: 'Agent', input: { subagent_type: 'design-harness:ui-review', prompt: `fingerprint: ${fp}` } }] } }
+  const launched = { type: 'user', message: { content: [{ tool_use_id: 'toolu_B', type: 'tool_result', content: 'Async agent launched successfully.' }] }, toolUseResult: { status: 'async_launched', agentId: 'agentQ' } }
+  const handback = (from, text) => ({ type: 'user', isMeta: true, message: { content: 'Another Claude session sent a message' }, origin: { kind: 'peer', from, handback: true, handbackReportText: text } })
+  const t = (...extra) => {
+    const p = join(dir, `bg-${Math.random().toString(36).slice(2)}.jsonl`)
+    writeFileSync(p, [call, launched, ...extra].map((e) => JSON.stringify(e)).join('\n'))
+    return p
+  }
+  // controls: the token from another agent, or typed by the session itself, is not a review
+  assert.ok(hook(dir, 'Stop', { transcript_path: t(handback('agentOther', `review-token: ${token}\nreport`)), stop_hook_active: true }).out, 'another agent\'s hand-back does not count')
+  const fresh = repo({ 'src/a.tsx': 'x\n' })
+  hook(fresh, 'UserPromptSubmit')
+  write(fresh, { 'src/a.tsx': 'y\n' })
+  const fp2 = fpOf(askFor(fresh))
+  const tok2 = tokenOf(fresh, fp2)
+  const call2 = { ...call, message: { content: [{ ...call.message.content[0], input: { subagent_type: 'design-harness:ui-review', prompt: `fingerprint: ${fp2}` } }] } }
+  const p2 = join(fresh, 'bg.jsonl')
+  writeFileSync(p2, [call2, launched, handback('agentQ', `review-token: ${tok2}\nNo findings.`)].map((e) => JSON.stringify(e)).join('\n'))
+  assert.equal(hook(fresh, 'Stop', { transcript_path: p2 }).out, null, 'the hand-back with the token from the agent it started ends it')
+
+  const typedRepo = repo({ 'src/a.tsx': 'x\n' })
+  hook(typedRepo, 'UserPromptSubmit')
+  write(typedRepo, { 'src/a.tsx': 'y\n' })
+  const fp3 = fpOf(askFor(typedRepo))
+  const call3 = { ...call, message: { content: [{ ...call.message.content[0], input: { subagent_type: 'design-harness:ui-review', prompt: `fingerprint: ${fp3}` } }] } }
+  const typed = { type: 'user', message: { content: [{ type: 'text', text: `review-token: ${tokenOf(typedRepo, fp3)}` }] } }
+  const p3 = join(typedRepo, 'typed.jsonl')
+  writeFileSync(p3, [call3, launched, typed].map((e) => JSON.stringify(e)).join('\n'))
+  assert.match(hook(typedRepo, 'Stop', { transcript_path: p3 }).out?.hookSpecificOutput?.additionalContext ?? '', /has not reported/, 'a token typed into the conversation is not a review')
+})

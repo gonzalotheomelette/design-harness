@@ -56,7 +56,21 @@ try {
   process.exit(0)
 }
 
-const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd()
+// The project is the checkout the session works in. In a desktop worktree session CLAUDE_PROJECT_DIR names the main
+// checkout, not the worktree the edits land in: on 2026-11-09 a test session's change in its worktree was diffed
+// against the untouched main checkout, and the gate never fired. So the session's own folder comes first when it
+// runs the harness, then the project folder.
+const topOf = (dir) => {
+  try {
+    return dir ? git(dir, 'rev-parse', '--show-toplevel').trim() : null
+  } catch {
+    return null
+  }
+}
+const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd()
+const cwdTop = topOf(input.cwd)
+// Only a different checkout moves the root; the same checkout keeps the folder as the project names it.
+const root = cwdTop && cwdTop !== topOf(projectDir) && loadConfig(cwdTop) ? cwdTop : projectDir
 const config = loadConfig(root)
 if (!config) {
   if (input.hook_event_name === 'Stop') warnOutside()
@@ -153,7 +167,7 @@ try {
 // not matched as text. A call counts only when Claude Code recorded its result as completed (an errored call also
 // returns a result) AND that result, the report itself, carries the packet's token. Matching the token anywhere in
 // the transcript let a session that had read the packet itself, or echoed a completion notice, pass a review that
-// never opened it. A review run in the background is never counted: the hook asks for the foreground.
+// never opened it. A review run in the background counts once its report is handed back (see below), not before.
 function reviewOf(fingerprint, agent = 'design-harness:ui-review', kind = 'review') {
   if (!fingerprint || !input.transcript_path || !existsSync(input.transcript_path)) return { called: false, reported: false }
   let token = null
@@ -179,13 +193,25 @@ function reviewOf(fingerprint, agent = 'design-harness:ui-review', kind = 'revie
         calls.add(b.id)
   if (!calls.size) return { called: false, reported: false }
   let completed = false
+  // A call run in the background returns at once with the agent's id; its report comes back later as a hand-back the
+  // app writes, naming that agent in its origin. Some sessions can only run agents that way (2026-11-09: the gate
+  // could never pass there), so a hand-back from the agent this call started counts like a foreground report. The
+  // origin is written by the app, not by the session, so a session cannot forge one.
+  const launched = new Set()
   for (const e of entries)
     for (const b of blocks(e))
-      if (e.type === 'user' && b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error && e.toolUseResult?.status === 'completed') {
+      if (e.type === 'user' && b.type === 'tool_result' && calls.has(b.tool_use_id) && !b.is_error) {
+        if (e.toolUseResult?.status === 'async_launched' && e.toolUseResult?.agentId) launched.add(e.toolUseResult.agentId)
+        if (e.toolUseResult?.status !== 'completed') continue
         completed = true
         const report = typeof b.content === 'string' ? b.content : JSON.stringify(b.content ?? '')
         if (token && report.includes(`review-token: ${token}`)) return { called: true, reported: true }
       }
+  for (const e of entries)
+    if (e.origin?.handback && launched.has(e.origin.from)) {
+      completed = true
+      if (token && String(e.origin.handbackReportText ?? '').includes(`review-token: ${token}`)) return { called: true, reported: true }
+    }
   return { called: true, reported: false, unread: completed }
 }
 
@@ -401,7 +427,7 @@ function main() {
           (pending
             ? review.unread
               ? `the ui-review you ran did not open its packet (its report lacks the review-token line); run it again. `
-              : `the ui-review you started has not reported, and a review still running in the background does not count. `
+              : `the ui-review you started has not reported; one still running in the background counts only once its report is handed back, so wait for it. `
             : '') +
           // Screenshots only when the project asks for them: on the 2026-11-01 benchmark they added 1.5 to 4 minutes a
           // review and caught none of the visual corrections. The measurements stay on: seconds each, and they are what
@@ -413,8 +439,8 @@ function main() {
               (config.screenshots ? `, and take pictures of them with ${shoot}` : '') +
               `, writing all the output to ${packet.dir}/browser.txt. `
             : '') +
-          `${packet.serving ? '2' : '1'}. Run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) and ` +
-          `wait for its report. Its prompt: "packet: ${packet.dir}", "fingerprint: ${fingerprint}", and one sentence on ` +
+          `${packet.serving ? '2' : '1'}. Run the design-harness:ui-review agent in the FOREGROUND (run_in_background: false) where this session can, and ` +
+          `wait for its report; a background run counts once its report is handed back. Its prompt: "packet: ${packet.dir}", "fingerprint: ${fingerprint}", and one sentence on ` +
           `what the change is for. The reviewer has no shell; the packet holds the change and the checks. ` +
           `Then fix the findings you agree with in what this turn built. Anything that would change a surface this turn ` +
           `did not set out to change, or that contradicts what the person asked for, is theirs to decide: list it for ` +
@@ -472,10 +498,10 @@ function tasteStep(state, save) {
           `This change touched a page that persuades or is read (${list}; \`artDirection\` in .claude/design-harness.json), so the ` +
           `art-direction critic judges it before it is handed back: the reviewer asks whether it is right, the critic whether it has ` +
           `a point of view. ` +
-          (pending ? (critic.unread ? 'The critique you ran did not open its packet (its report lacks the review-token line); run it again. ' : 'The critique you started has not reported; one still running in the background does not count. ') : '') +
+          (pending ? (critic.unread ? 'The critique you ran did not open its packet (its report lacks the review-token line); run it again. ' : 'The critique you started has not reported; one still running in the background counts only once its report is handed back, so wait for it. ') : '') +
           `1. From the project root, with the dev server serving this checkout, run \`node ${HARNESS}/bin/direction-packet.mjs --packet=${dir} /<route> ...\` ` +
           `for the pages this change renders (add --said="<the person's words about the page>" when they gave any). ` +
-          `2. Run the design-harness:art-direction agent in the FOREGROUND (run_in_background: false). Its prompt: "packet: ${dir}", ` +
+          `2. Run the design-harness:art-direction agent in the FOREGROUND (run_in_background: false) where this session can; a background run counts once its report is handed back. Its prompt: "packet: ${dir}", ` +
           `"fingerprint: ${fp}". 3. Show the person its verdict and directions before anything else you say about the work, in its ` +
           `words, including "not ready to show" when it says so. A clean check is not a verdict on taste.`,
       },
