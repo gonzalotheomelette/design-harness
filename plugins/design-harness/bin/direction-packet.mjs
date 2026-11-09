@@ -40,7 +40,9 @@ const lines = (shot.stdout ?? '').split('\n')
 const taken = []
 for (const l of lines) {
   const m = l.match(/^\s{2}(\/\S+\.png)\s{2}\((.+)\)$/)
-  if (!m || !existsSync(m[1])) continue
+  // The screenshot script also writes a red-boxed comparison with its last capture of each screen, for the reviewer.
+  // The critic judges the page, not a change, so those stay out (2026-11-09: they reached it as extra pictures).
+  if (!m || !existsSync(m[1]) || m[2].startsWith('changed since')) continue
   const name = `${String(taken.length + 1).padStart(2, '0')}-${basename(m[1])}`
   copyFileSync(m[1], join(pics, name))
   taken.push({ path: join(pics, name), what: m[2] })

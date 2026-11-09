@@ -1275,3 +1275,26 @@ test('while the reviewer and then the critic run in the background, the turn end
   assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null)
   assert.equal(state().tasteDone, fp, 'done because the critique reported')
 })
+
+test('a change put back the way the branch found it asks for no review; a different change still does', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  hook(dir, 'UserPromptSubmit', { prompt: 'add a probe' })
+  write(dir, { 'src/a.tsx': 'probe\n' })
+  const fp = fpOf(askFor(dir))
+  hook(dir, 'Stop', { transcript_path: reported(dir, fp) })
+  hook(dir, 'UserPromptSubmit', { prompt: 'take the probe out' })
+  write(dir, { 'src/a.tsx': 'x\n' })
+  assert.equal(hook(dir, 'Stop').out, null, 'the revert leaves the file as the branch had it: nothing to review')
+  // control: putting something else there is a change
+  hook(dir, 'UserPromptSubmit', { prompt: 'now change it' })
+  write(dir, { 'src/a.tsx': 'z\n' })
+  assert.match(askFor(dir), /ui-review/)
+})
+
+test('screenshots reduce motion and finish running animations before each capture, and the critic gets no comparison images', () => {
+  const lib = readFileSync(join(HARNESS, 'bin', 'lib.mjs'), 'utf8')
+  assert.match(lib, /reducedMotion: 'reduce'/)
+  assert.match(lib, /prefers-reduced-motion', value: 'reduce'/)
+  assert.equal((lib.match(/page\.evaluate\(finishMotion\)/g) ?? []).length, 2, 'both browsers finish animations before a capture')
+  assert.match(readFileSync(join(HARNESS, 'bin', 'direction-packet.mjs'), 'utf8'), /startsWith\('changed since'\)/)
+})

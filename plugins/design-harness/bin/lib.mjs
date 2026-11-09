@@ -342,6 +342,17 @@ const BROWSERS = [
   '/usr/bin/google-chrome',
   '/usr/bin/chromium',
 ]
+// Motion at its end, for a still: every animation the page is running, CSS or script (the Web Animations API), is
+// finished. CSS-only settling missed a site that reveals on scroll with element.animate(): on 2026-11-09 a critic was
+// handed desktop pictures with a heading half off the edge and tiles still grey, and judged motion that was mid-flight.
+// An endless loop cannot finish and is left where it is.
+const finishMotion = () => {
+  for (const a of document.getAnimations?.() ?? []) {
+    try {
+      a.finish()
+    } catch {}
+  }
+}
 export async function openBrowser(root, config) {
   const pw = projectRequire(root, 'playwright') ?? projectRequire(root, '@playwright/test')
   if (pw) {
@@ -351,7 +362,9 @@ export async function openBrowser(root, config) {
       kind: 'playwright',
       hasAxe: !!axeLib,
       async page({ colorScheme = 'light', viewport }) {
-        const page = await browser.newPage({ colorScheme, viewport })
+        // Reduced motion: a site that respects it shows every part in place, where an entrance waiting to be scrolled
+        // to would leave a band of the screen empty.
+        const page = await browser.newPage({ colorScheme, viewport, reducedMotion: 'reduce' })
         return {
           goto: (url) => page.goto(url, { waitUntil: 'networkidle' }),
           screenshot: (path) => page.screenshot({ path, fullPage: true }),
@@ -360,6 +373,8 @@ export async function openBrowser(root, config) {
           tile: async (path, y) => {
             await page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y)
             await page.waitForTimeout(700)
+            await page.evaluate(finishMotion)
+            await page.waitForTimeout(80)
             await page.screenshot({ path })
             return page.evaluate(() => Math.round(window.scrollY))
           },
@@ -387,13 +402,15 @@ export async function openBrowser(root, config) {
       async page({ colorScheme = 'light', viewport }) {
         const page = await browser.newPage()
         await page.setViewport(viewport)
-        await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: colorScheme }])
+        await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: colorScheme }, { name: 'prefers-reduced-motion', value: 'reduce' }])
         return {
           goto: (url) => page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 }),
           screenshot: (path) => page.screenshot({ path, fullPage: true }),
           tile: async (path, y) => {
             await page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y)
             await new Promise((r) => setTimeout(r, 700))
+            await page.evaluate(finishMotion)
+            await new Promise((r) => setTimeout(r, 80))
             await page.screenshot({ path })
             return page.evaluate(() => Math.round(window.scrollY))
           },

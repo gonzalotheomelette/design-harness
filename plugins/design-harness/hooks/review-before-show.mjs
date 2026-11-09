@@ -335,6 +335,10 @@ function main() {
   const carriedFiles = carried.flatMap((r) => gitDiff(root, '--relative', '--name-only', r.from, r.to, '--', ...UI).split('\n').filter(Boolean))
   const files = [...new Set([...changedSince(from), ...carriedFiles])]
   if (!files.length) process.exit(0)
+  // Files put back the way the branch found them (a revert, a probe undone) leave nothing to review. Compared with the
+  // branch's base, not HEAD, so committing a change can never stand in for reviewing it. On 2026-11-09 reverting a
+  // one-line test comment cost a second reviewer and a second critique.
+  if (!gitDiff(root, '--relative', '--name-only', baseOf(root, config), now, '--', ...files).trim()) process.exit(0)
 
   // Fixes the session made after this message's review. The next review reads them in full; before this turn ends,
   // the copy and drift checks read them once, so a fix that adds a long string or a raw value is not handed over.
