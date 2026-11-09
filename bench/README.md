@@ -3,10 +3,12 @@
 The steps and scripts to repeat the 2026-10-31 and 2026-11-01 runs. The data they ran on is not in this tree,
 because it quotes the projects' code and describes a client's product: `cases.tsv` (each case's introducing commit,
 the fix that corrected it and what the change was for, in the website `gonzalotheomelette/omelette-website` and a
-client prototype), the website's answer keys, reports and correction list, and both rounds' scores. It stays in this
-repository's history up to commit `2409cae`. Restore it into a folder outside the checkout and point the scripts at it:
+client prototype), the website's answer keys, reports and correction list, and both rounds' scores. It is kept in
+Omelette's private copy of this repository, `gonzalotheomelette/design-harness-private`, at commit `2409cae`. With
+access, restore it into a folder outside the checkout and point the scripts at it:
 
-    mkdir <data> && git archive 2409cae bench | tar -x -C <data> --strip-components=1
+    git clone -q https://github.com/gonzalotheomelette/design-harness-private.git <old>
+    mkdir <data> && git -C <old> archive 2409cae bench | tar -x -C <data> --strip-components=1
     export BENCH_DATA=<data>
 
 The client prototype's answer keys were never kept, since they quote its code; only its scores were.
