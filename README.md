@@ -37,7 +37,9 @@ held-out project whose corrections were mostly visual and product calls, with no
 change that: the visual corrections were missed with and without them. What did catch one class, line breaks, was a
 measurement, which is now `check-breaks.mjs`. Rerun on 0.17.0 with the reviewer on Opus 5.5, it caught 2 more of the
 held-out project's 21 corrections a run (3.7 against 1.7 under the same judge), none more on the client prototype,
-and wrote about 40% more findings, at a median 3.3 minutes a review.
+and wrote about 40% more findings, at a median 3.3 minutes a review. A second measurement, `check-layout.mjs`, catches overflow, rows laid out
+two ways and blocks a column off their siblings; built from two of the designer's corrections, it flags both and
+nothing after their fixes, and none of the benchmark's other visual corrections, which are of other kinds.
 
 - **Product work in the same place.** A requirement per surface (`docs/product/`), a decision log and an open
   questions register sit beside the design files. The reviewer checks each surface against its requirement, so a
@@ -123,7 +125,7 @@ plugins/design-harness/
   skills/feedback/                  client notes in (Google Docs, Claude Docs, Granola), sorted, built, answered
   skills/web-design-guidelines/     Vercel's wider review, for PR time
   reference/ai-look.md              the devices that read as generated
-  bin/                              check-copy-length, check-drift, check-a11y, check-breaks, shoot, server-of (run from a
+  bin/                              check-copy-length, check-drift, check-a11y, check-breaks, check-layout, shoot, server-of (run from a
                                     project root). Copy and drift parse with the TypeScript in bin/vendor, never
                                     the project's; check-a11y and shoot, which the session runs, use the project's
                                     own Playwright or Puppeteer

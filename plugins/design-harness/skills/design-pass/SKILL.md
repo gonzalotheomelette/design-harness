@@ -41,7 +41,8 @@ Screenshot the surface at desktop and phone width, in each colour mode the produ
 Most corrections are second-order effects of your own edit, in the region beside the one you meant to change. Use
 the project's `screenshot` command when it names one, else `node <harness>/bin/shoot.mjs /<route>` from the
 project root; the browser pane can stall transitions, so a picture from it is not proof. Run
-`node <harness>/bin/check-breaks.mjs /<route>` too: a one-word last line or a stranded first word changes with the
+`node <harness>/bin/check-breaks.mjs /<route>` and `node <harness>/bin/check-layout.mjs /<route>` too: a one-word
+last line, a row that runs off a phone or a block a column off its siblings changes with the
 width, and three widths catch what one picture misses.
 
 ## 5. Let the reviewer read it

@@ -380,11 +380,12 @@ function main() {
               : `the ui-review you started has not reported, and a review still running in the background does not count. `
             : '') +
           // Screenshots only when the project asks for them: on the 2026-11-01 benchmark they added 1.5 to 4 minutes a
-          // review and caught none of the visual corrections. The two measurements stay on: seconds each, and the
-          // break check is what caught a visual class.
+          // review and caught none of the visual corrections. The measurements stay on: seconds each, and they are what
+          // caught the visual classes (line breaks, check-breaks.mjs; overflow, grouping and alignment, check-layout.mjs).
+          // Screenshots, when on, come with the regions changed since the last capture boxed.
           (packet.serving
             ? `1. The dev server serves this checkout, so run \`node ${HARNESS}/bin/check-a11y.mjs /<route>\` and ` +
-              `\`node ${HARNESS}/bin/check-breaks.mjs /<route>\` on the pages this change renders` +
+              `\`node ${HARNESS}/bin/check-breaks.mjs /<route>\` and \`node ${HARNESS}/bin/check-layout.mjs /<route>\` on the pages this change renders` +
               (config.screenshots ? `, and take pictures of them with ${shoot}` : '') +
               `, writing all the output to ${packet.dir}/browser.txt. `
             : '') +

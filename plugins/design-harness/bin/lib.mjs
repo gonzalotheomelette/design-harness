@@ -412,6 +412,45 @@ export function lineFlags(lines, lean = LEAN_WORDS) {
   return flags
 }
 
+// What a picture shows and a reviewer reading one misses, as numbers from the laid-out page (check-layout.mjs measures
+// it; this decides what to report, so the rules are tested without a browser). Three kinds:
+//   overflow   anything past the screen's edge, and a page that scrolls sideways
+//   groups     repeated siblings in a row (dates under their dots, cards in a strip): items that lay out their parts
+//              two different ways, and a last item that wraps onto a line of its own
+//   blocks     on a many-column grid, a text block that starts a column or so off the edge its siblings share
+// Built from the designer's corrections on Omelette's site (2026-11-08): a row of release dots whose dates sat beside
+// some dots and under others and ran off a phone, and an FAQ that started on column 5 where every other block used 6.
+export function layoutFlags(m) {
+  const flags = []
+  if (m.scrollWidth > m.width + 1) flags.push(`the page scrolls sideways: it is ${m.scrollWidth}px wide on a ${m.width}px screen`)
+  for (const o of m.overflow ?? [])
+    flags.push(o.left < -1 ? `${o.name} starts ${-o.left}px left of the screen` : `${o.name} runs past the right edge: it ends at ${o.right}px on a ${m.width}px screen`)
+  for (const g of m.groups ?? []) {
+    const stacked = g.items.filter((i) => i.stacked === true).length
+    const beside = g.items.filter((i) => i.stacked === false).length
+    if (stacked && beside) flags.push(`${g.name}: its ${g.items.length} items lay out their parts two ways, ${stacked} stacked and ${beside} side by side`)
+    // the items' visual lines, top to bottom: a new line starts where an item begins below half of the line's tallest
+    const lines = []
+    for (const i of [...g.items].sort((a, b) => a.top - b.top || a.left - b.left)) {
+      const line = lines.at(-1)
+      if (line && i.top < line.top + line.height / 2) line.items.push(i)
+      else lines.push({ top: i.top, height: i.height, items: [i] })
+      lines.at(-1).height = Math.max(lines.at(-1).height, i.height)
+    }
+    if (lines.length > 1 && lines.at(-1).items.length === 1 && lines[0].items.length >= 3)
+      flags.push(`${g.name}: its last item${lines.at(-1).items[0].label ? ` ("${lines.at(-1).items[0].label}")` : ''} wraps onto a line of its own, under ${lines[0].items.length} on the first`)
+  }
+  const blocks = m.blocks ?? []
+  const uses = new Map()
+  for (const b of blocks) uses.set(b.left, (uses.get(b.left) ?? 0) + 1)
+  for (const b of blocks) {
+    if (uses.get(b.left) > 1) continue
+    const near = [...uses].filter(([edge, n]) => n >= 3 && edge !== b.left && Math.abs(edge - b.left) <= 1.5 * b.pitch).sort((x, y) => Math.abs(x[0] - b.left) - Math.abs(y[0] - b.left))[0]
+    if (near) flags.push(`${b.name} starts at ${b.left}px; ${near[1]} other blocks on the page start at ${near[0]}px, ${Math.round(Math.abs(near[0] - b.left) / b.pitch * 10) / 10} column(s) away`)
+  }
+  return flags
+}
+
 // `**/` is any depth, `**` anything, `*` anything within one folder. Placeholders first: the single-star step used to
 // rewrite the `.*` the double-star step had just written, so `**/theme.css` matched one folder deep and no deeper,
 // and a theme file at src/styles/theme.css was flagged as drift. tests/harness.test.mjs holds the cases.

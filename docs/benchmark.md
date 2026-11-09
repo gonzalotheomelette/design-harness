@@ -66,6 +66,34 @@ Read but no Grep or Glob, and 5 of the 39 runs used a read-only shell search aga
 carried the person's request. The reports and scores quote both projects' code, so they are not in this tree.
 `bench/scripts/make-judging-fixed.py` and `tally-fixed.py` build and total this round's judging.
 
+## Measuring what pictures miss: the layout check and changed regions (2026-11-08)
+
+The 0.12.1 round showed that a reviewer given screenshots still misses the corrections that only show on the page, and
+that a measurement (the line-break check) catches them. Two more measurements followed from the designer's corrections
+on Omelette's site on 2026-11-08: the release dots on the Method page, whose dates sat beside some days' dots and
+under others' and fell apart on a phone, and the Services FAQ, which started on column 5 where every other block used
+6. `check-layout.mjs` measures, at 360, 768 and 1280px: anything past the screen's edge; repeated siblings that lay out
+their parts two ways or leave one item alone on a line; and on a many-column grid, a text block a column or so off the
+edge its siblings share. `shoot.mjs` now keeps each capture and boxes what changed since the last one, with motion
+settled so a playing loop is not a change.
+
+| Run | What it flagged |
+|---|---|
+| The site before the two fixes (3661a44): Services, Method, home, Work, a case, Privacy | Both corrections: the FAQ at 439px against 542px (desktop), the release days laid out two ways (tablet, desktop), and one dot alone on a line (phone). Nothing else |
+| The same pages after the fixes (05a319b) | Nothing |
+| A capture of Method's outcomes before, then after | The dots row boxed as changed, and the footer below it, which moved up because the row got shorter. A third, unchanged capture reported no change |
+| The website cases' introducing commits (W1, W2, W6, W7), nine page loads at three widths | Two flags, both the same two blocks on W6 and W7's home page a column off their neighbours; the designer kept both, so they are false alarms. The break check found 29 bad breaks on W6, as in the 0.12.1 round |
+
+What it says: **the layout check catches the class it was built for, and only that class.** None of the benchmark's
+eight visual-only corrections is an overflow, grouping or alignment slip, so it caught none of them. Sorted by what
+would catch them: one is a line break (the break check has it); one a gap out of rhythm (44px under a text where every
+other text-to-button gap is 28); one motion (two loops stacked on a phone); one type (a subtitle on a different optical
+size from the titles); two state colours in one list; one the cursor's hover chrome; and one a colour inside a video,
+which no measurement of the page reaches. The next measurements, in the order these suggest: gaps between a text and
+its button against the page's own rhythm, playing animations per phone screen, and type settings of one role compared
+across the page. The two corrections it was built from are its only true positives so far, so it is unproven on new
+work until it catches a slip nobody has corrected yet.
+
 ## 0.12.1 with screenshots, on the held-out website (2026-11-01)
 
 The question: do pictures catch the visual corrections the code-only reviews missed? The six website cases were run
