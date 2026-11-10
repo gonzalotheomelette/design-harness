@@ -59,3 +59,5 @@ reviewer, an art-direction critic and nine skills. A day of runs on the Omelette
 taste side failing: every direction it produced was turned down, and a rebuild without its rules drifted into another
 brand's look. It was retired for the simpler setup above. Its code is kept at the
 [`v0.19.0`](https://github.com/gonzalotheomelette/design-harness/tree/v0.19.0) tag.
+The marketplace still lists it, pinned to that tag, so a project can switch it on for a test with
+`design-harness@omelette`. Nothing enables it by default.
