@@ -1,8 +1,0 @@
-{
-  "devServer": "http://localhost:3000",
-  "modes": [
-    "light"
-  ],
-  "allowPalette": false,
-  "artDirection": []
-}
