@@ -17,7 +17,7 @@ For any coding agent (Claude Code, Codex, Cursor). Claude Code reads it through 
 
 ## Where design work runs
 
-Open the session for design work in this project's own folder. The design harness's review, art-direction critic and
+Open the session for design work in this project's own folder. The design harness's review and
 skills key off the session's folder, so work on this project from a session opened anywhere else gets none of them.
 
 ## Before building a surface

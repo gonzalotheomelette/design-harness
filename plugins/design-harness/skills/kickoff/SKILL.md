@@ -24,9 +24,9 @@ Ask for what is missing, in one message, conversationally:
   If there is none, that is the normal case: build it together in step 1b.
 - **Three to five sites whose taste they trust**, for the pages that persuade or are read: whole sites, not features,
   and a line on what each does that they want. Run the `references` skill on them before any of those pages is
-  designed: they are the bar the art-direction critic judges against. Without them the critic falls back on the
-  model's own defaults, and every page drifts to the average of its category (2026-11-09: a Method page and two rounds
-  of proposals for it, all "very simple and questionable", with no reference picked for the site).
+  designed: they are where the `direction` skill starts its search. Without them every page drifts to the average of
+  its category (2026-11-09: a Method page and two rounds of proposals for it, all "very simple and questionable", with
+  no reference picked for the site).
 
 Then pull references by **pattern class**, not feature ("resource calendar with staff as rows", not "scheduling
 page") from Mobbin when it is connected, and note what each reference does structurally.
@@ -164,10 +164,9 @@ From `${CLAUDE_SKILL_DIR}/templates/`, and from the settings written out below:
   it. `allowPalette` stays `false` unless the project's tokens are Tailwind's own palette. Screenshots stay off: the
   accessibility and line-break checks run whenever the dev server is up, but screenshots in every review cost
   minutes and, measured, caught nothing more; add `"screenshots": true` for a project where layout is the work.
-  `artDirection` lists the rendered files of the pages PRODUCT.md marks Persuade or Read (for a site in Astro, say
-  `src/pages/index.astro`, `src/components/home/**`): a change to one is held for the art-direction critic after the
-  reviewer, so a marketing page is never handed back on clean checks alone. Leave Operate screens out; the reviewer
-  covers them.
+  `previews` lists the files of directions shown behind switches (for a site in Astro, say
+  `src/components/dir/**`): drift and the rules file leave them alone, since a direction exists to depart from the
+  site. Taste is never gated: the art-direction critic is a second opinion the `direction` skill asks for.
   Commit the file: the harness reads its settings from the last commit, so a change cannot loosen them on the way
   through.
 - A project tool that takes screenshots as a signed-in persona, or a browser outside the usual places, goes in

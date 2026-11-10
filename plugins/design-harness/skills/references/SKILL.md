@@ -1,6 +1,6 @@
 ---
 name: references
-description: Gathers design references for a surface or a pattern, has the designer pick, and keeps the picks in the project with what each teaches, so the art-direction critic and every later build compare against them. Searches Mobbin when it is connected, inspo (real production websites, over MCP) and any site the designer names. Use before designing a new page, section or pattern, when the designer shares a link they like, when a page is called basic or generic and there is nothing to compare it with, or when asked for references, inspiration or examples.
+description: Gathers design references for a surface or a pattern, has the designer pick, and keeps the picks in the project with what each teaches, so the direction skill's search and every later build start from them. Searches Mobbin when it is connected, inspo (real production websites, over MCP) and any site the designer names. Use before designing a new page, section or pattern, when the designer shares a link they like, when a page is called basic or generic and there is nothing to compare it with, or when asked for references, inspiration or examples.
 ---
 
 # References

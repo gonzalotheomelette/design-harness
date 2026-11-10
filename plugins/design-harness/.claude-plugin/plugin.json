@@ -1,7 +1,7 @@
 {
   "name": "design-harness",
-  "version": "0.19.0",
-  "description": "Review before show for UI work: a Stop hook holds any turn that changed rendered files until a fresh-context reviewer has compared the change with its sibling surfaces, the project's settled rules and the AI-look register, and checked copy length, token drift, accessibility, line breaks and layout. An art-direction critic judges a page's taste against references the designer picked and their past picks, and answers with directions to try on the page. Plus a mood-board kickoff and a learn skill that turns corrections into rules and picks into a record. Ships inspo, real production websites over MCP, as a reference source.",
+  "version": "0.20.0",
+  "description": "Review before show for UI work: a Stop hook holds any turn that changed rendered files until a fresh-context reviewer has compared the change with its sibling surfaces, the project's settled rules and the AI-look register, and checked copy length, token drift, accessibility, line breaks and layout. Taste is never gated: a direction skill shows outside candidates one at a time, has fresh agents build whole-page directions (one a no-context control) and lets the designer pick blind, with an art-direction critic as an optional second opinion. Plus a mood-board kickoff and a learn skill that turns corrections into rules and picks into a record. Ships inspo, real production websites over MCP, as a reference source.",
   "author": {
     "name": "Gonzalo Hernandez",
     "url": "https://github.com/gonzalotheomelette"

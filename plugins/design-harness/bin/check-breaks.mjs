@@ -90,7 +90,7 @@ try {
       for (const { tag, lines } of blocks)
         for (const flag of lineFlags(lines, lean)) {
           flagged++
-          console.log(`  ${new URL(url).pathname} [${label}] ${tag} "${lines.join(' / ').slice(0, 90)}": ${flag}`)
+          console.log(`  ${new URL(url).pathname}${new URL(url).search} [${label}] ${tag} "${lines.join(' / ').slice(0, 90)}": ${flag}`)
         }
       await page.close()
     }

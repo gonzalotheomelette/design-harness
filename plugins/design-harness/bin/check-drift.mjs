@@ -173,7 +173,7 @@ function stringsByAst(file, src) {
 const findings = []
 let read = 0
 for (const [file, lines] of scope) {
-  if (matchesAny(file, config.themeFiles)) continue
+  if (matchesAny(file, config.themeFiles) || matchesAny(file, config.previews ?? [])) continue
   let text
   try {
     text = readFileSync(join(root, file), 'utf8').split('\n')
@@ -232,7 +232,7 @@ for (const [file, lines] of scope) {
 console.log(`drift: ${read} added line(s) read across ${scope.size} rendered file(s); theme files exempt`)
 // The population from git's list of changed files, read independently of the line parser: when git's output was not
 // what the parser expects, the parser found nothing and the check used to pass.
-const unread = filesWithAdditions(root, base, config.ui).filter((f) => !matchesAny(f, config.themeFiles)).length
+const unread = filesWithAdditions(root, base, config.ui).filter((f) => !matchesAny(f, config.themeFiles) && !matchesAny(f, config.previews ?? [])).length
 if (!read && unread) {
   console.log(`drift: NOT A CLEAN PASS. ${unread} changed file(s) could not be read; check them by hand.`)
   process.exit(2)

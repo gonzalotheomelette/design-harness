@@ -1096,78 +1096,75 @@ test('the kickoff\'s project settings leave the file lists to the defaults', () 
 
 // Art direction (2026-11-09): pages that persuade or are read get the critic after the reviewer, with the same proof of
 // reading, once a message, and never a loop.
-const TASTE = { ui: ['src/**/*.tsx'], themeFiles: ['**/theme.css'], artDirection: ['src/pages/**'] }
-const criticReported = (dir, fp, transcript, id = 'toolu_C', token = readFileSync(join(gitDir(dir), 'design-harness', 'tokens', `taste-${fp}`), 'utf8').trim()) => {
-  const call = { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Agent', input: { subagent_type: 'design-harness:art-direction', prompt: `packet: x\nfingerprint: ${fp}` } }] } }
-  const done = { type: 'user', message: { content: [{ tool_use_id: id, type: 'tool_result', content: [{ type: 'text', text: `review-token: ${token}\nVERDICT: not ready to show` }] }] }, toolUseResult: { status: 'completed' } }
-  const p = join(dir, `${id}.jsonl`)
-  writeFileSync(p, [readFileSync(transcript, 'utf8'), ...[call, done].map((e) => JSON.stringify(e))].join('\n'))
-  return p
-}
+const TASTE = { ui: ['src/**/*.tsx'], themeFiles: ['**/theme.css'] }
+const SESSION = join(HARNESS, 'hooks', 'session-version.mjs')
 
-test('a change to an art-directed page is held for the critic after the reviewer, until its report carries the token', () => {
-  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
+// 0.20.0: taste is never gated. Until 0.19.0 a change to a page listed in `artDirection` was held for the critic after
+// the reviewer; on 2026-11-09 its verdict was "not ready to show" on everything it saw.
+test('taste is never gated: a reviewed change to a marketing page ends the turn, even with the old artDirection setting', () => {
+  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, { ...TASTE, artDirection: ['src/pages/**'] })
   hook(dir, 'UserPromptSubmit', { prompt: 'make the home page less plain' })
   write(dir, { 'src/pages/home.tsx': 'y\n' })
-  const fp = fpOf(askFor(dir))
-  const afterReview = hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out?.hookSpecificOutput?.additionalContext ?? ''
-  assert.match(afterReview, /design-harness:art-direction/)
-  assert.match(afterReview, new RegExp(`fingerprint: ${fp}`))
-  assert.match(afterReview, /direction-packet\.mjs --packet=/)
-  assert.match(afterReview, /src\/pages\/home\.tsx/)
-  const packet = join(gitDir(dir), 'design-harness', 'direction', fp)
-  const readme = readFileSync(join(packet, 'README.md'), 'utf8')
-  assert.match(readme.split('\n')[0], /^review-token: [0-9a-f]{16}$/)
-  assert.match(readme, /make the home page less plain/, "the person's own words reach the critic")
-  // a report without the token is not a critique
-  const forged = criticReported(dir, fp, reported(dir, fp), 'toolu_F', 'deadbeefdeadbeef')
-  assert.match(hook(dir, 'Stop', { transcript_path: forged, stop_hook_active: true }).out?.hookSpecificOutput?.additionalContext ?? '', /did not open its packet/)
-  assert.equal(hook(dir, 'Stop', { transcript_path: criticReported(dir, fp, reported(dir, fp)) }).out, null, 'the critique with the token ends it')
+  const ctx = askFor(dir)
+  assert.match(ctx, /design-harness:ui-review/, 'control: the reviewer is still asked for')
+  assert.doesNotMatch(ctx, /art-direction/)
+  assert.equal(hook(dir, 'Stop', { transcript_path: reported(dir, fpOf(ctx)) }).out, null, 'the review ends it; no critic is asked for')
+  assert.ok(!existsSync(join(gitDir(dir), 'design-harness', 'direction')), 'no critic packet is written')
 })
 
-test('a fix after the critic tells the person its verdict was on the earlier version, once', () => {
-  // 2026-11-09: a session fixed both pages after a "not ready to show" and handed them over as if they had been judged.
-  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
-  hook(dir, 'UserPromptSubmit', { prompt: 'make the home page less plain' })
-  write(dir, { 'src/pages/home.tsx': 'y\n' })
-  const fp = fpOf(askFor(dir))
-  hook(dir, 'Stop', { transcript_path: reported(dir, fp) })
-  const both = criticReported(dir, fp, reported(dir, fp))
-  assert.equal(hook(dir, 'Stop', { transcript_path: both }).out, null, 'the critique ends the gate')
-  write(dir, { 'src/pages/home.tsx': 'z\n' })
-  const out = hook(dir, 'Stop', { transcript_path: both }).out
-  assert.match(out?.systemMessage ?? '', /critic's verdict was on the version before the latest fixes/)
-  assert.match(out?.hookSpecificOutput?.additionalContext ?? '', /verdict was on the earlier version/)
-  write(dir, { 'src/pages/home.tsx': 'zz\n' })
-  assert.doesNotMatch(hook(dir, 'Stop', { transcript_path: both }).out?.systemMessage ?? '', /critic's verdict/, 'said once a message')
-})
-
-test('a change outside the art-directed pages gets the reviewer only', () => {
-  const dir = repo({ 'src/app/table.tsx': 'x\n' }, TASTE)
-  hook(dir, 'UserPromptSubmit')
-  write(dir, { 'src/app/table.tsx': 'y\n' })
-  const fp = fpOf(askFor(dir))
-  assert.equal(hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out, null)
-})
-
-test('a critic that is never run lets the turn end with a note to the person, not a loop', () => {
-  const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
-  hook(dir, 'UserPromptSubmit')
-  write(dir, { 'src/pages/home.tsx': 'y\n' })
-  const fp = fpOf(askFor(dir))
-  const t = reported(dir, fp)
-  assert.match(hook(dir, 'Stop', { transcript_path: t }).out?.hookSpecificOutput?.additionalContext ?? '', /art-direction/)
-  assert.match(hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out?.systemMessage ?? '', /critic did not report/)
-  assert.equal(hook(dir, 'Stop', { transcript_path: t, stop_hook_active: true }).out, null)
-})
-
-test('the critic has no shell, and its packet lists every picture by path with the mode from PRODUCT.md', () => {
+test('the critic has no shell and gives no verdict; its packet lists every picture by path with the mode from PRODUCT.md', () => {
   const agent = readFileSync(join(HARNESS, 'agents', 'art-direction.md'), 'utf8')
   assert.match(agent, /^tools: Read, Grep, Glob$/m)
-  assert.match(agent, /review-token/)
+  assert.doesNotMatch(agent, /VERDICT:|PLAIN:/)
+  assert.match(agent, /no direction is worse for departing from\s+DESIGN\.md/)
   const src = readFileSync(join(HARNESS, 'bin', 'direction-packet.mjs'), 'utf8')
   assert.match(src, /each by its full path/)
   assert.match(src, /Persuade\|Read\|Operate/)
+})
+
+test('commits a fast-forward brings in during the turn are not its change; the session\'s own edit still is', () => {
+  // 2026-11-09: a worktree fast-forwarded onto another session's reviewed branch, and the hook sent that branch's
+  // seven files to the reviewer and the critic as this session's work.
+  const dir = repo({ 'src/a.tsx': 'x\n', 'src/b.tsx': 'x\n' })
+  const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: dir, stdio: 'ignore' })
+  git('checkout', '-q', '-b', 'other')
+  write(dir, { 'src/b.tsx': 'from another session\n' })
+  git('commit', '-qam', 'earlier work')
+  git('checkout', '-q', 'main')
+  const later = new Date(Date.now() + 2000)
+  hook(dir, 'UserPromptSubmit', { prompt: 'take the other branch, then look' })
+  // the turn's start is recorded in whole seconds; make sure the earlier commit is older than it
+  const state = JSON.parse(readFileSync(join(gitDir(dir), 'review-before-show.s1.json'), 'utf8'))
+  state.startedAt = Math.floor(later.getTime() / 1000)
+  writeFileSync(join(gitDir(dir), 'review-before-show.s1.json'), JSON.stringify(state))
+  git('merge', '-q', '--ff-only', 'other')
+  assert.equal(hook(dir, 'Stop').out, null, 'only brought-in work: nothing to review')
+  // control: an edit of the session's own in the same turn is reviewed, and only that file
+  write(dir, { 'src/a.tsx': 'mine\n' })
+  const ctx = askFor(dir)
+  assert.match(ctx, /src\/a\.tsx/)
+  assert.doesNotMatch(ctx, /src\/b\.tsx/)
+})
+
+test('drift leaves the files listed in previews alone, and still reads the rest', () => {
+  const dir = repo({ 'src/a.tsx': 'x\n' }, { ui: ['src/**/*.tsx', 'src/**/*.css'], themeFiles: ['**/theme.css'], previews: ['src/dir/**'] })
+  write(dir, {
+    'src/dir/bold.css': '.x { color: #d00000; font-size: 173px; }\n',
+    'src/a.tsx': 'export const A = () => <b className="text-[#d00000]">x</b>\n',
+  })
+  const r = check(dir, 'check-drift.mjs')
+  assert.doesNotMatch(r.stdout, /src\/dir\/bold\.css/)
+  assert.match(r.stdout, /src\/a\.tsx:1/, 'control: a raw value outside the previews is still flagged')
+})
+
+test('the session line names the version loaded, and the update commands when the project pins another', () => {
+  const version = JSON.parse(readFileSync(join(HARNESS, '.claude-plugin', 'plugin.json'), 'utf8')).version
+  const run = (dir) => JSON.parse(spawnSync('node', [SESSION], { input: JSON.stringify({ cwd: dir }), encoding: 'utf8' }).stdout || 'null')
+  const dir = repo({ 'src/a.tsx': 'x\n' })
+  assert.match(run(dir).systemMessage, new RegExp(`Design harness ${version.replace(/\./g, '\\.')} loaded\\.`))
+  write(dir, { '.claude/settings.local.json': JSON.stringify({ extraKnownMarketplaces: { omelette: { source: { source: 'github', repo: 'gonzalotheomelette/design-harness', ref: 'v0.0.1' } } } }) })
+  assert.match(run(dir).systemMessage, /pins 0\.0\.1.*claude plugin marketplace update/)
+  assert.equal(run(repo({ 'src/a.tsx': 'x\n' }, null)), null, 'silent where the harness is not set up')
 })
 
 test('a session opened outside a harness project is told once when it edits that project', () => {
@@ -1254,13 +1251,14 @@ test('a review run in the background counts once the app hands its report back, 
 // message, the hook took it for the person's next message and reset, and the critic was never asked for.
 const HANDBACK = '<agent-message from="a58e567d7dbfd9832">\n[Subagent hand-back] The text below is the final report of a subagent.\n  review-token: x'
 
-test('a hand-back the app delivers continues the message: the reviewed change still goes on to the critic', () => {
+test('a hand-back the app delivers continues the message: the reviewed change is recorded, not reset', () => {
   const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
   hook(dir, 'UserPromptSubmit', { prompt: 'make home less plain' })
   write(dir, { 'src/pages/home.tsx': 'y\n' })
   const fp = fpOf(askFor(dir))
   hook(dir, 'UserPromptSubmit', { prompt: HANDBACK })
-  assert.match(hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out?.hookSpecificOutput?.additionalContext ?? '', /design-harness:art-direction/)
+  assert.equal(hook(dir, 'Stop', { transcript_path: reported(dir, fp) }).out, null)
+  assert.equal(JSON.parse(readFileSync(join(gitDir(dir), 'review-before-show.s1.json'), 'utf8')).request, 'make home less plain', 'the person\'s message survives the hand-back')
   // control: a message from the person does start a new message
   const other = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
   hook(other, 'UserPromptSubmit', { prompt: 'first' })
@@ -1283,7 +1281,7 @@ test('work from a message the hook never saw start is carried, not lost', () => 
   assert.ok(existsSync(join(packetDir(dir, fpOf(ctx)), 'carried.diff')), 'the earlier work reaches the reviewer as carried')
 })
 
-test('while the reviewer and then the critic run in the background, the turn ends quietly, and their hand-backs finish the gate', () => {
+test('while the reviewer runs in the background, the turn ends quietly, and its hand-back finishes the gate', () => {
   const dir = repo({ 'src/pages/home.tsx': 'x\n' }, TASTE)
   hook(dir, 'UserPromptSubmit', { prompt: 'make home less plain' })
   write(dir, { 'src/pages/home.tsx': 'y\n' })
@@ -1308,17 +1306,7 @@ test('while the reviewer and then the critic run in the background, the turn end
 
   hook(dir, 'UserPromptSubmit', { prompt: HANDBACK })
   handBack('agR', `review-token: ${tokenOf(dir, fp)}\nNo findings.`)
-  assert.match(hook(dir, 'Stop', { transcript_path: t() }).out?.hookSpecificOutput?.additionalContext ?? '', /design-harness:art-direction/)
-
-  launch('toolu_C', 'design-harness:art-direction', 'agC', fp)
-  assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null, 'the critic is running: the turn ends quietly')
-  assert.equal(hook(dir, 'Stop', { transcript_path: t(), stop_hook_active: true }).out, null, 'and again, with no "did not report" note')
-  assert.notEqual(state().tasteDone, fp, 'a critique still running is not done')
-
-  hook(dir, 'UserPromptSubmit', { prompt: HANDBACK })
-  handBack('agC', `review-token: ${readFileSync(join(gitDir(dir), 'design-harness', 'tokens', `taste-${fp}`), 'utf8').trim()}\nVERDICT: not ready to show`)
-  assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null)
-  assert.equal(state().tasteDone, fp, 'done because the critique reported')
+  assert.equal(hook(dir, 'Stop', { transcript_path: t() }).out, null, 'the hand-back with the token ends the gate')
 })
 
 test('a change put back the way the branch found it asks for no review; a different change still does', () => {

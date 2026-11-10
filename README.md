@@ -23,17 +23,19 @@ makes after the review are read by the next one.
   folders, a style tile and a sample screen, and switches the review loop on for the project.
 - **Rules that grow from corrections.** `/design-harness:learn` turns each correction into a row in the project's
   `docs/ui-consistency.md`, so the same slip is caught automatically next time.
-- **Taste, from your own references.** Everything above looks backward: it can say a page is inconsistent, broken or
-  AI-made, never that it is plain. `/design-harness:references` gathers references from Mobbin, inspo (832 real
-  production websites, shipped with the harness as an MCP server) and any site you name, and keeps only the ones you
-  pick, each with what it teaches. An art-direction critic judges whether a page has a point of view against those
-  references and your past picks (`design/picks.md`), and ends with a verdict. It is not optional: a change to a page
-  the project lists in `artDirection` (its Persuade and Read pages) is held after the review until the critic has
-  read it, with the same proof of reading, and its verdict is shown to you first. `/design-harness:direction` puts its
-  two or three directions on the page behind switches so you choose by looking. Run blind on 2026-11-09, it stopped
-  both proposals the designer had rejected that day ("not ready to show", 4 and 3 of 5 ways a page goes plain), and
-  was harsher than him on a live case page (2 of 5): it is not yet calibrated against his eye.
-- **Design work runs where the harness runs.** The review, the critic and the skills key off the session's own
+- **Taste is chosen, never gated.** Everything above checks a change is right; nothing in the harness passes or fails
+  taste. `/design-harness:direction` shows outside candidates from the best of your own field (Mobbin, inspo's 832
+  production websites shipped as an MCP server, and the sites you name) one at a time for a yes or no, then has three
+  fresh agents each build a whole-page direction behind switches: two from your yeses, one a control built from the
+  brief and the code alone. You pick blind; the round records whether the control won. Why: until 0.19.0 an
+  art-direction critic gated every marketing page with a verdict, and on 2026-11-09 it said "not ready to show" to
+  everything, its rules (written from the live site) kept every direction small, and in a blind test a five-minute
+  control with no harness was the boldest of three. The critic stays as a second opinion the skill can ask for, with
+  no verdict. Preview directions are listed in `previews`, so drift and the rules file leave them alone.
+- **The version you loaded, said once.** At session start, one line names the harness version loaded, and the update
+  commands when it is not the one the project pins (a pin in settings is not applied until the marketplace copy is
+  updated).
+- **Design work runs where the harness runs.** The review and the skills key off the session's own
   folder. A session opened somewhere else that edits a project using the harness is told so, once, by name: one
   afternoon's work on a website went unreviewed that way. The warning reaches only sessions where the plugin is
   enabled, so enable it for your user, not just the project, if you open sessions outside your projects.
@@ -135,9 +137,10 @@ your-project/
 ```
 .claude-plugin/marketplace.json     the "omelette" marketplace: design-harness plus the pinned external plugins
 plugins/design-harness/
-  hooks/                            review-before-show (Stop + UserPromptSubmit): the turn gate and the review packet
+  hooks/                            review-before-show (Stop + UserPromptSubmit): the turn gate and the review packet;
+                                    session-version (SessionStart): the one line naming the version loaded
   agents/ui-review.md               the reviewer: the latest Opus, Read, Grep and Glob, no shell
-  agents/art-direction.md           the taste critic: judges against picked references, answers with directions and a verdict
+  agents/art-direction.md           a second opinion on taste: ranks built directions against picked references, no verdict
   bin/direction-packet.mjs          the critic's packet: pictures listed by path, each page's mode read from PRODUCT.md
   .mcp.json                         inspo, real production websites as references (a hosted, read-only service)
   skills/kickoff/                   mood board to a project that knows its identity, with templates
@@ -169,9 +172,9 @@ rules or its model change.
 
 ## What it does not cover yet
 
-- Taste, measured: the benchmark counts corrections caught, and a critic's directions are not corrections. Its
-  measure will be how often its verdict matches the designer's, and how often he picks one of its directions over
-  the page as it stands. The picks log is the data for both.
+- Taste, measured: the benchmark counts corrections caught, and directions are not corrections. Every direction round
+  now keeps a no-context control and records whether it won; that log is the measure. If the control keeps winning,
+  the direction skill is adding cost, not taste.
 - Briefs sent to Mobbin and inspo leave the machine. The references skill writes them without client names or
   anything under NDA; inspo's hosted endpoint says it logs tool names and timings, never queries or IPs. Disable the
   `inspo` server in `/mcp` for a project that must not use it.

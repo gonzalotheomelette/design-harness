@@ -60,16 +60,13 @@ Then ask the questions the designer would:
 - Is it a first draft presented as a finished one?
 - Would it have been better if something existing had been reused? If yes, go back to step 1.
 
-For a marketing or reading page, or anything the designer has called basic, the art-direction critic judges it
-before it is shown: the review-before-show hook asks for it after the reviewer when the change touches a file the
-project lists in `artDirection`, and the `direction` skill runs it on demand. The reviewer checks it is right; the
-critic asks whether it has a point of view. If the project has no references yet, say so: the critique is weaker
-without them.
+For a marketing or reading page, or anything the designer has called basic, offer directions (the `direction` skill)
+rather than one version: the designer chooses by looking. The reviewer checks a change is right; nothing in the
+harness passes or fails taste.
 
 ## 6. Show
 
-Lead with the critic's verdict when there is one, in its words, "not ready to show" included. Then say what you
-reused, what you took from references, what the reviewer flagged that you left, and what you are unsure of. Never call
+Say what you reused, what you took from references, what the reviewer flagged that you left, and what you are unsure of. Never call
 work ready because the checks are clean: they measure slips, not taste. Show live URLs rather than batches of
 screenshots.
 

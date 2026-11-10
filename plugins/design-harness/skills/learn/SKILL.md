@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Turns a designer's correction into a written rule the reviewer will enforce, and a designer's pick among options into a record the art-direction critic reads. Use right after the designer corrects copy, a component's styling, placement, an icon, or anything that a sibling surface or a settled decision would have caught, and whenever they choose between options, directions, toggles or references.
+description: Turns a designer's correction into a written rule the reviewer will enforce, and a designer's pick among options into a record of their own words. Use right after the designer corrects copy, a component's styling, placement, an icon, or anything that a sibling surface or a settled decision would have caught, and whenever they choose between options, directions, toggles or references.
 ---
 
 # Learn from a correction
@@ -45,7 +45,10 @@ Then tell the designer, in one line, the rule you wrote and how many siblings br
 
 A correction says what was wrong. A pick says what they want: which of several options, directions, toggles or
 references they chose, and which they left. Corrections become rules; picks are taste, and taste is a pattern across
-many picks, so they are kept as a log the art-direction critic reads, not as rules anyone enforces.
+many picks, so they are kept as a log in their own words, not as rules anyone enforces. Do not add a summary of the
+picks ("pattern so far", "they prefer restraint"): on 2026-11-09 such a summary, written by the session, told the
+critic and every later build to stay small, and the designer then asked for "more distinct and strong". When a pick
+is built for real, it updates DESIGN.md in the same change: the rules follow the picks.
 
 Add a row to `design/picks.md` (create it with this header the first time) in the same turn as the pick:
 

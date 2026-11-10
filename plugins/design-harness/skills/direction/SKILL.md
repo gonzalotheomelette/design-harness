@@ -1,88 +1,74 @@
 ---
 name: direction
-description: Finds outside ideas for a page (wide for a new product, blended for an existing one), lets the designer pick the ones that pull before anything is built, builds directions from them behind switches on the real page, has the art-direction critic judge each, and records the choice. Use when a page or section is called basic, plain, generic, flat or unrefined, before a marketing or reading page is shown as finished, or when asked for directions, options, a bolder take or an art direction pass.
+description: Gives a page new directions the designer chooses between by looking. Shows outside candidates from the best of the designer's own field one at a time for a yes or no, has three fresh agents each build a whole-page direction from the yeses (one of them a control with no context), puts them behind switches, and lets the designer pick blind. Use when a page or section is called basic, plain, generic, flat or unrefined, or when asked for directions, options, a bolder take or an art direction pass.
 ---
 
 # Direction
 
-The review loop catches slips; it cannot say a page is plain. This is the loop that can. Its order matters, and it
-comes from one day on the Omelette site (2026-11-09): with directions drawn only from the critic and the site's own
-pages, three rounds came back "very simple and questionable", "nothing really worth checking", and then a set the
-critic itself dropped once built (it judges far better than it invents). The designer's diagnosis: the harness was not
-looking outside. So ideas come from outside first, the designer picks before anything is built, and the critic filters.
+Three steps. Its shape comes from one day on the Omelette site (2026-11-09), where the old seven-step version failed in
+front of the designer and a five-minute control beat it:
 
-## 1. Name the mode
+- Directions the critic invented were turned down every round ("very simple and questionable", "nothing really worth
+  checking").
+- Searching by pattern class sent the search to the category's average (SaaS pricing pages): "your sources are mostly
+  non-creative companies".
+- Rules written from the live site (DESIGN.md, the picks summary, "one move per direction", "the smallest move") kept
+  every build small: the harness's two directions changed only the top of the page.
+- One fresh agent given only the brief and the code rebuilt the whole page and was the boldest of the three.
 
-Ask nothing the project already answers.
+So: outside ideas from the designer's own field, chosen by them one at a time; whole-page directions built by fresh
+agents who carry no rules; a blind pick; and a control in every round, which keeps the harness honest.
 
-- **Wide**: something new from scratch: no DESIGN.md yet, or the designer says the page is new. Go super wide:
-  candidates that could be radically different from each other, in structure, type, colour and motion. The kickoff's
-  mood-board round is this mode.
-- **Blend**: something that exists (a DESIGN.md and live surfaces). Outside ideas are welcome, and each one has to
-  blend in with what is already in place: take one structural move from it and say it in the project's own type,
-  colour, imagery and motion. A candidate whose idea only works in another brand's language is dropped, not toned down.
+## 1. Candidates, one at a time
 
-The designer's words for the two, 2026-11-09: "if we are building something new from scratch, it is good to go super
-wide and explore different options that could be radically different", and "where there is something existing so the
-new ideas need to blend in nicely with whats already in place".
+Search where the designer's peers at the top of their field are: for a studio, award-level creative studios and the
+designer's named references; for a product, the best products in its space. Mobbin (`search_sections`,
+`search_screens`) and inspo (`search_screens` with the matching `industry`) when connected, and the sites themselves
+in the browser. Never the category's average for the page type (tier-card pricing pages, capability lists): name
+what you left and why.
 
-## 2. Diagnose, briefly
+Keep 6 to 10. For each: the live link (or the Mobbin link when the live page has changed, saying so), the one move it
+makes, and one line on how it would look here, in the brand's own assets. Show them **one at a time, yes or no**, with
+an optional reason (an interactive card stack when the host can render one; the designer asked for exactly this). Record
+the round in `design/picks.md` in the designer's words only: what was shown, what got a yes, what got a no.
 
-Build the packet for the page as it stands (step 6 shows the command) and ask the critic the first question only: what
-the page's category does by default, which of the five ways it goes plain, and its moment. That names what to look for
-outside. Its own directions are a starting point, not the menu.
+If the designer says the whole set is wrong, ask nothing: record their words and search again with that correction.
 
-## 3. Search outside
+## 2. Three whole-page directions, by fresh agents
 
-Always, in both modes, by **pattern class**, not feature ("a studio's process told as evidence", not "method page"):
+For the yeses, start three agents in parallel, each building one direction of the **whole page** (not a section) into
+its own file behind the switch panel, `?dir=<id>`:
 
-- the sites the designer names and the ones in `design/references/`, opened in the browser;
-- the designer's own bookmarks or competitors, when they share them (most will be the category's average: say so);
-- Mobbin (`search_sections`, `search_screens`) and inspo (`recommend`, `find_examples_for_macrostructure`,
-  `search_screens`) when connected. Briefs leave the machine: describe the pattern, never a client or anything under NDA.
+- **Two from the yeses**, one per agent, each with: the designer's brief in their words, the yes candidates with their
+  links and the one move each makes, the page's file, and the brand's own assets (wordmark, type family, drawn marks,
+  voice, facts). Tell them the site's layout, rhythm, scale and colour rules are open, and that a direction keeps the
+  brand's assets, not its current page.
+- **One control**: the brief and the code only. No candidates, no references, no picks, no DESIGN.md, no skills.
 
-Keep 6 to 12. For each: the link, the **one structural move** it makes, and, in blend mode, **one line on how it would
-read in this project** (its type, its colour, its own patterns). Write down what you looked at and left, and why.
+Each agent writes only its own direction file (a component the page renders when its `?dir=` is on, scoped CSS
+inside it), never the page's shared files, so the three never collide. Name the switches 1, 2, 3 in a shuffled order
+and keep the mapping in the session's notes, not in the panel or the page. Nothing of the panel renders without the
+environment flag, so none of it can reach a deploy.
 
-## 4. Let the designer pick, before building
+When the three are built, run the browser checks on every `?dir=` route (`check-breaks.mjs`, `check-layout.mjs`,
+`check-a11y.mjs`) and fix what is broken (overflow, contrast, a line that strands a word) in **every** direction
+alike, the control included: a broken control proves nothing. Do not make any of them safer.
 
-Show the candidates as links with their one-line move and translation. A link is the live page; no mock-ups yet. Ask
-which pull, which repel, and why. Record the round in `design/picks.md` and the picks in `design/references/` (the
-`references` skill, step 4), in their words. This is the cheapest moment to be wrong; a built direction costs an
-hour and a critique.
+The project's `previews` setting should list the direction files, so drift and the rules file leave them alone.
 
-If the designer would rather react to built options than to links, say what that costs and build from your own top
-picks, naming each one's source.
+## 3. The blind pick
 
-## 5. Build the directions behind switches
+Give the designer the three links and the Live page, labelled 1, 2, 3, and ask which they would pick and why. Say
+nothing about which came from where until they have picked.
 
-Two or three directions, each from one picked move, each a different kind of answer. Build them on the real page,
-not as mock-ups: a small panel that turns each on, kept in the browser so it holds across pages, and nothing of it on
-the main branch or in a deploy (render it only when an environment flag is set). Each direction also opens by link,
-`?dir=<id>`, so the designer gets one live URL per direction and the packet can capture each one. Label invented copy
-in the panel, and name each direction's source there.
+When they ask for a second opinion, or before showing when the session doubts all three, run
+`node <harness>/bin/direction-packet.mjs --packet=<folder> /<route>?dir=<id> [...]` and the
+`design-harness:art-direction` agent on it, told that the origins are withheld. It ranks; it does not pass or fail.
+Show its ranking after the designer's pick, not before, so it cannot steer a blind test.
 
-Check every direction at desktop and phone width with the break, layout and accessibility checks, passing each
-`?dir=` route, before anyone judges it.
+Then reveal the mapping, and record the round in `design/picks.md`: what was shown, what was picked, what was left, in
+their words, and **whether the control won**. If the control wins two rounds running, say so to the designer: the
+harness is adding cost, not taste, and this skill should be cut further.
 
-## 6. Ask the critic, about each direction
-
-From the project root, with the dev server serving this checkout:
-
-```
-node <harness>/bin/direction-packet.mjs --packet=<folder> /<route>?dir=<id> [...] --said="<the designer's words>"
-```
-
-One packet can hold every direction: each `?dir=` route gets its own pictures. Run the `design-harness:art-direction`
-agent with `packet: <folder>` (and the hook's `fingerprint:` when it asked), and tell it the mode and which source
-each direction came from.
-
-**Its verdict is shown first**, in its words, with what it would change, including "not ready to show". Drop what it
-drops. When you fix what it named, its verdict was on the earlier version: say so to the designer, or run it again.
-Never present work as finished on the strength of clean checks.
-
-## 7. Record the choice
-
-When the designer picks, add the round to `design/picks.md` (the learn skill's pick entry): what was shown, what
-was picked, what was left, in their words. Then build the pick properly on a branch, like any change: it goes
-through the review loop.
+When a pick is built for real, it updates DESIGN.md in the same change (the rules follow the picks, not the reverse),
+and it goes through the review loop like any change.

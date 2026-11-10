@@ -180,7 +180,7 @@ try {
       read++
       for (const flag of layoutFlags(m)) {
         flagged++
-        console.log(`  ${new URL(url).pathname} [${label}, ${viewport.width}px] ${flag}`)
+        console.log(`  ${new URL(url).pathname}${new URL(url).search} [${label}, ${viewport.width}px] ${flag}`)
       }
       await page.close()
     }

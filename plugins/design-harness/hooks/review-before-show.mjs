@@ -25,13 +25,15 @@
  * After the review, fixes the session makes are checked once by the copy and drift checks before the turn ends; the
  * next review reads them in full.
  *
- * Art direction. When the change touches a page the project lists in `artDirection` (its Persuade and Read pages),
- * the turn is also held for the art-direction critic, after the reviewer and with the same proof of reading: a packet
- * whose README starts with a token the critic's report must start with. The reviewer asks whether the change is
- * right; the critic asks whether the page has a point of view, which no check can. On 2026-11-09 a session built two
- * proposals for a marketing page, ran every check, reported them clean, and the designer called them "very simple and
- * questionable"; the critic, run blind on both afterwards, said "not ready to show" for reasons close to his. It had
- * been an optional line in the design pass, and the session skipped it every time. The critic is asked once a message.
+ * Taste is not gated (0.20.0). Until 0.19.0 a change to a page listed in `artDirection` was also held for the
+ * art-direction critic, whose verdict had to reach the person first. On 2026-11-09 it said "not ready to show" on every
+ * page it saw, all day, so it told the person nothing, and its rules scored any departure from the live site as a
+ * defect: in a blind test it marked down the version the designer was weighing for breaking DESIGN.md. The critic is
+ * now a second opinion the direction skill asks for, never a gate. This hook checks correctness only.
+ *
+ * Work that arrived by git, not by the session, is not this turn's change: a merge, a checkout or a fast-forward onto
+ * commits made before the turn began moves the turn's baseline with it (2026-11-09: a fast-forward onto another
+ * session's reviewed branch was sent to the reviewer and the critic as this session's work).
  *
  * It asks at most `maxReviewsPerMessage` times per message (default once), then lets the turn end with a note to the
  * person, so it can never loop. It is silent in a project without .claude/design-harness.json. The request is returned
@@ -45,7 +47,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSyn
 import { dirname, join, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { baseOf, git, gitDiff, gitDirOf, keepTree, loadConfig, matchesAny, pathspec, snapshot, treeExists } from '../bin/lib.mjs'
+import { baseOf, broughtInBase, git, gitDiff, gitDirOf, headOf, keepTree, loadConfig, pathspec, snapshot, treeExists } from '../bin/lib.mjs'
 
 const HARNESS = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -94,8 +96,6 @@ const TREE = [...config.ui, ...DOCS]
 const packetOf = (fingerprint) => join(gitDir, 'design-harness', 'review', fingerprint)
 // The token is kept outside the packet; the reviewer finds it only on the first line of change.diff.
 const tokenOf = (fingerprint, kind = 'review') => join(gitDir, 'design-harness', 'tokens', kind === 'review' ? fingerprint : `${kind}-${fingerprint}`)
-// The art-direction critic's packet: its own folder, so a reviewer's packet is never mistaken for it.
-const directionOf = (fingerprint) => join(gitDir, 'design-harness', 'direction', fingerprint)
 const readLog = () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean) : [])
 const isLogged = (fp) => readLog().some((l) => l.split(' ')[0] === fp)
 // Each review is logged with the branch it was made on, so the fallback range (no turn snapshot) never starts from a
@@ -158,7 +158,7 @@ try {
     })
     // The person's own words go to the reviewer: the session's one-line summary of its own work is the framing a
     // fresh reader is there to avoid.
-    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart, carried, request: String(input.prompt ?? '').slice(0, 6000) }))
+    writeFileSync(statePath, JSON.stringify({ blocks: 0, turnStart, headAtStart: headOf(root), startedAt: Math.floor(Date.now() / 1000), carried, request: String(input.prompt ?? '').slice(0, 6000) }))
     process.exit(0)
   }
   if (input.hook_event_name && input.hook_event_name !== 'Stop') process.exit(0)
@@ -264,6 +264,7 @@ function writePacket(fingerprint, from, now, UI, state, carriedDiff = '') {
       '- request.md: what the person asked for this turn, in their own words',
       "- settings.json: the harness settings in effect: the project's as last committed (the working copy only before the first commit), plus this machine's local ones",
       '- server.txt: whether the dev server serves this checkout',
+      ...(config.previews?.length ? [`- preview files (\`previews\` in settings.json: ${config.previews.join(', ')}): directions shown behind switches, built to depart from the site. Judge them for correctness only (broken behaviour, overflow, line breaks, accessibility, facts, copy rules), never for consistency with siblings, DESIGN.md or the rules file`] : []),
       `- the AI-look register: ${HARNESS}/reference/ai-look.md`,
       '- browser.txt: screenshots and accessibility, when the session took them (listed image paths open with Read)',
       '',
@@ -294,7 +295,17 @@ function main() {
 
   // Did THIS turn change anything rendered? Without a usable turn snapshot (the hook was installed mid-session, or
   // the tree is gone), fall back to the branch.
-  const turnStart = treeExists(root, state.turnStart) ? state.turnStart : null
+  let turnStart = treeExists(root, state.turnStart) ? state.turnStart : null
+  // Commits brought in during the turn (made before it began) move the baseline: they are not this turn's edits.
+  if (turnStart && state.headAtStart) {
+    const moved = broughtInBase(root, turnStart, state.headAtStart, state.startedAt, TREE)
+    if (moved && moved !== turnStart) {
+      turnStart = moved
+      state.turnStart = moved
+      keepTree(root, 'turn', moved)
+      save()
+    }
+  }
   if (turnStart && !changedSince(turnStart).length) process.exit(0)
   const hadTurnStart = !!turnStart
 
@@ -304,13 +315,8 @@ function main() {
   if (state.lastBlocked && state.askedTree && !isLogged(state.lastBlocked) && reviewOf(state.lastBlocked).reported) {
     logReview(state.lastBlocked, state.askedTree)
     state.reviewed = true
-    if (state.tasteNeeded) state.tasteFor = state.lastBlocked
     save()
   }
-
-  // The critic, once the reviewer has reported on a change that touched an art-directed page. Before anything below:
-  // a reported review with no edits since leaves no files to diff, and the turn would otherwise end there.
-  if (tasteStep(state, save)) process.exit(0)
 
   // The change to review: this message's own work, from the turn's start or from unreviewed work carried in. Only
   // when the hook has no turn snapshot (installed mid-session) does it fall back to the last review on this branch,
@@ -363,14 +369,6 @@ function main() {
           ? `Review before show: ${created.length} rendered file(s) created after this message's review were not reviewed (${created.slice(0, 5).join(', ')}); the next review reads them.`
           : null
       if (note) state.notedCreated = true
-      // The critic judged the page before these fixes. Said once, so the person never takes its verdict for one on the
-      // version they are shown (2026-11-09: a session fixed three pages after a "not ready to show" and handed them over
-      // as if the critic had passed them).
-      const tasteNote =
-        state.tasteDone && !state.notedTaste
-          ? `Art direction: the critic's verdict was on the version before the latest fixes (${changedSince(state.askedTree).slice(0, 5).join(', ')}); it has not seen this one.`
-          : null
-      if (tasteNote) state.notedTaste = true
       // The browser checks (line breaks, layout, accessibility) read the page, so only the session can run them on the
       // routes these fixes reach. Asked for once a message: before, fixes after the review were read by the copy and
       // drift checks only, and a phone layout the reviewer never saw went to the person unmeasured (2026-11-09).
@@ -391,11 +389,10 @@ function main() {
           .flatMap((r) => r.out.split('\n').filter((l) => /^ {2}\S/.test(l)))
       }
       save()
-      const told = [note, tasteNote].filter(Boolean).join(' ')
+      const told = note ?? ''
       const asks = [
         ...(found.length ? [`The work after the review added these, which the checks flag:\n${found.slice(0, 12).join('\n')}\nFix them, or tell the person why they stay.`] : []),
         ...(measure ? [measure] : []),
-        ...(tasteNote ? ["Tell the person, before anything else about this work, that the critic's verdict was on the earlier version."] : []),
       ]
       if (!asks.length && !told) process.exit(0)
       process.stdout.write(
@@ -416,9 +413,7 @@ function main() {
     logReview(fingerprint, now)
     state.reviewed = true
     state.askedTree = now
-    if (state.tasteNeeded) state.tasteFor = fingerprint
     save()
-    tasteStep(state, save)
     process.exit(0)
   }
   const pending = review.called || (input.background_tasks ?? []).some((t) => /ui-review/.test(JSON.stringify(t)))
@@ -445,9 +440,6 @@ function main() {
   if (!rechase) {
     state.blocks += 1
     state.lastBlocked = fingerprint
-    // Pages that persuade or are read get the critic after the reviewer; it is asked for once the review reports.
-    state.tasteFiles = config.artDirection?.length ? files.filter((f) => matchesAny(f, config.artDirection)) : []
-    state.tasteNeeded = state.tasteFiles.length > 0
     state.askedTree = now
     keepTree(root, 'asked', now)
     save()
@@ -491,69 +483,7 @@ function main() {
   process.exit(0)
 }
 
-// The art-direction critic, after the reviewer. Returns true when it wrote the hook's answer (the caller exits).
-// Asked once a message: a critique still running is asked for once more, then the turn ends with a note, never a loop.
-function tasteStep(state, save) {
-  const fp = state.tasteFor
-  if (!fp || state.tasteDone === fp) return false
-  const critic = reviewOf(fp, 'design-harness:art-direction', 'taste')
-  if (critic.reported) {
-    state.tasteDone = fp
-    save()
-    return false
-  }
-  const pending = critic.called || (input.background_tasks ?? []).some((t) => /art-direction/.test(JSON.stringify(t)))
-  // Still running in the background: end the turn quietly and look again at the hand-back, rather than ask again and
-  // then tell the person "the critic did not report" while it is still reading (2026-11-09).
-  if (critic.running && state.tasteAsked === fp) return true
-  const list = (state.tasteFiles ?? []).slice(0, 8).join(', ')
-  if (state.tasteAsked === fp) {
-    if (pending && !state.tasteRechased) {
-      state.tasteRechased = true
-      save()
-    } else {
-      state.tasteDone = fp
-      save()
-      process.stdout.write(JSON.stringify({ systemMessage: `Art direction: the critic did not report on this change to ${list}; the person has not had its verdict.` }))
-      return true
-    }
-  } else {
-    state.tasteAsked = fp
-    save()
-  }
-  const dir = directionOf(fp)
-  if (!existsSync(tokenOf(fp, 'taste')) || !existsSync(join(dir, 'README.md'))) {
-    mkdirSync(dir, { recursive: true })
-    mkdirSync(dirname(tokenOf(fp, 'taste')), { recursive: true })
-    const token = randomBytes(8).toString('hex')
-    writeFileSync(tokenOf(fp, 'taste'), token)
-    writeFileSync(
-      join(dir, 'README.md'),
-      `review-token: ${token}\n\n# Art direction packet ${fp}\n\nStart your report with the review-token line above, exactly as written.\n\n` +
-        `The change touched: ${list}.\n\nWhat the person asked for this turn, in their words:\n\n> ${String(state.request || '(not recorded)').slice(0, 1500).replace(/\n/g, '\n> ')}\n`,
-    )
-  }
-  process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'Stop',
-        additionalContext:
-          `This change touched a page that persuades or is read (${list}; \`artDirection\` in .claude/design-harness.json), so the ` +
-          `art-direction critic judges it before it is handed back: the reviewer asks whether it is right, the critic whether it has ` +
-          `a point of view. ` +
-          (pending ? (critic.unread ? 'The critique you ran did not open its packet (its report lacks the review-token line); run it again. ' : 'The critique you started has not reported; one still running in the background counts only once its report is handed back, so wait for it. ') : '') +
-          `1. From the project root, with the dev server serving this checkout, run \`node ${HARNESS}/bin/direction-packet.mjs --packet=${dir} /<route> ...\` ` +
-          `for the pages this change renders (add --said="<the person's words about the page>" when they gave any). ` +
-          `2. Run the design-harness:art-direction agent in the FOREGROUND (run_in_background: false) where this session can; a background run counts once its report is handed back. Its prompt: "packet: ${dir}", ` +
-          `"fingerprint: ${fp}". 3. Show the person its verdict and directions before anything else you say about the work, in its ` +
-          `words, including "not ready to show" when it says so. A clean check is not a verdict on taste.`,
-      },
-    }),
-  )
-  return true
-}
-
-// Design work done from a session opened somewhere else. The hook, the reviewer and the critic key off the session's
+// Design work done from a session opened somewhere else. The hook and the reviewer key off the session's
 // own folder, so a session opened in one folder that edits a project running the harness gets none of them, silently.
 // On 2026-11-09 a whole afternoon of work on a website went that way, from a session opened in the harness's own
 // repository: no review, no critic, every proposal shown unjudged. This names it once a session, per project. It reads
@@ -607,7 +537,7 @@ function warnOutside() {
     JSON.stringify({
       systemMessage:
         `Design harness: this turn touched ${named}, which runs the design harness, but this session was opened in ${here}, where it ` +
-        `does not. Nothing here reviews or art-directs that work. Open a session in that project for design work on it.`,
+        `does not. Nothing here reviews that work. Open a session in that project for design work on it.`,
     }),
   )
 }

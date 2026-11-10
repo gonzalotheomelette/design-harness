@@ -21,6 +21,10 @@ export const DEFAULTS = {
   // Files allowed to hold raw colour values and arbitrary sizes: the theme the tokens are written into.
   // design/ holds the mood board and the style tile, which show raw swatches on purpose.
   themeFiles: ['**/theme.css', '**/tokens.css', '**/globals.css', '**/tailwind.css', 'DESIGN.md', 'design/**'],
+  // Preview directions: variants shown behind switches, built to depart from the site. The checks that hold a change to
+  // the site's own rules (drift, consistency) skip them; correctness checks (breaks, layout, accessibility) still run.
+  // Until 0.19.0 those rules scored every departure as a defect, and the directions came out as small as the rules.
+  previews: [],
   rules: 'docs/ui-consistency.md',
   design: 'DESIGN.md',
   product: 'PRODUCT.md',
@@ -38,11 +42,6 @@ export const DEFAULTS = {
   screenshots: false,
   // The colour modes the product ships. Screenshots and accessibility run in each; a light-only product says so here.
   modes: ['light', 'dark'],
-  // Rendered files of the pages that persuade or are read (PRODUCT.md's Persuade and Read modes). A change to one is
-  // judged by the art-direction critic after the reviewer, before it is handed back: on 2026-11-09 two proposals
-  // passed every check and were called "very simple and questionable", and the critic, run blind afterwards, stopped
-  // both. Empty by default; the kickoff fills it from PRODUCT.md. Each critique costs about two minutes.
-  artDirection: [],
 }
 
 // The default output buffer (1 MB) is smaller than the diff of one large refactor, and the hook then threw on every
@@ -115,6 +114,55 @@ function writeSnapshot(root, globs, scratch) {
 // Snapshot trees are referenced by nothing, so `git gc` prunes them after about two weeks, and a log pointing at a
 // pruned tree made the hook fail on every turn after. Keeping each one under a per-worktree ref stops the pruning;
 // treeExists lets a caller fall back if one is gone anyway.
+export function headOf(root) {
+  try {
+    return git(root, 'rev-parse', 'HEAD').trim()
+  } catch {
+    return null
+  }
+}
+
+// The turn's baseline with the work git brought in during the turn taken as it arrived. When HEAD moved to commits
+// that were all made before the turn began (a fast-forward, a merge of another branch, a checkout), the files those
+// commits changed are read at the new HEAD, so only the session's own edits remain to review. Commits the session made
+// during the turn are its work and leave the baseline alone. Returns the baseline tree, or null when nothing moved.
+export function broughtInBase(root, fromTree, headAtStart, startedAt, globs = DEFAULTS.ui) {
+  const head = headOf(root)
+  if (!head || !headAtStart || head === headAtStart || !startedAt) return null
+  let times
+  try {
+    times = git(root, 'log', '--format=%ct', `${headAtStart}..${head}`).split('\n').filter(Boolean).map(Number)
+    if (!times.length) times = [Number(git(root, 'log', '-1', '--format=%ct', head).trim())]
+  } catch {
+    return null
+  }
+  if (times.some((t) => t >= startedAt)) return null
+  const files = gitDiff(root, '--name-only', headAtStart, head, '--', ...pathspec(globs)).split('\n').filter(Boolean)
+  if (!files.length) return null
+  const scratch = join(gitDirOf(root), `design-harness.${process.pid}.${Math.random().toString(36).slice(2)}.base-index`)
+  const env = { ...process.env, GIT_INDEX_FILE: scratch }
+  const run = (...args) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  try {
+    run('read-tree', fromTree)
+    for (const f of files) {
+      const entry = run('ls-tree', head, '--', f).trim()
+      if (entry) {
+        const [meta] = entry.split('\t')
+        const [mode, , sha] = meta.split(' ')
+        run('update-index', '--add', '--cacheinfo', `${mode},${sha},${f}`)
+      } else {
+        run('update-index', '--force-remove', '--', f)
+      }
+    }
+    return run('write-tree').trim()
+  } catch {
+    return null
+  } finally {
+    rmSync(scratch, { force: true })
+    rmSync(`${scratch}.lock`, { force: true })
+  }
+}
+
 export function keepTree(root, name, tree) {
   try {
     git(root, 'update-ref', `refs/worktree/design-harness/${name}`, tree)
