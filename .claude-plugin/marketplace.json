@@ -5,16 +5,9 @@
     "url": "https://github.com/gonzalotheomelette"
   },
   "metadata": {
-    "description": "Omelette's design harness: a review-before-show loop for UI work, a mood-board kickoff, and the external design skills it builds on, each pinned to a commit that was read and checked."
+    "description": "Omelette's design setup: the outside design plugins it uses, each pinned to a commit that was read and checked."
   },
   "plugins": [
-    {
-      "name": "design-harness",
-      "source": "./plugins/design-harness",
-      "version": "0.19.0",
-      "description": "Review before show (a Stop hook plus a fresh-context ui-review agent that compares each change with its sibling surfaces, the project's settled rules and the AI-look register), copy-length, drift, accessibility, line-break and layout checks, an art-direction critic that judges taste against the designer's own references and picks, a mood-board kickoff, and a learn skill that turns corrections into rules and picks into a record.",
-      "category": "design"
-    },
     {
       "name": "frontend-design",
       "source": {
@@ -23,7 +16,7 @@
         "path": "plugins/frontend-design",
         "sha": "a7ba5b93db0c7c8d17f3f1d25853adca79598a1a"
       },
-      "description": "Anthropic's frontend-design skill: plans a design, reviews the plan against the looks AI-generated design falls into, then builds. Used at kickoff and for anything new.",
+      "description": "Anthropic's frontend-design skill: commits to an aesthetic direction and a real type pairing before any code, so the result does not fall back to the average look.",
       "category": "design"
     },
     {
@@ -32,9 +25,9 @@
         "source": "git-subdir",
         "url": "https://github.com/pbakaus/impeccable.git",
         "path": "plugin",
-        "sha": "4f956490f0056ae1ff5ea80372cf56e83c001d3c"
+        "sha": "4ae73c595b2c9a32c1a5e7d2ca5d34f5b954922d"
       },
-      "description": "Optional, off by default: Paul Bakaus's Impeccable, critique, audit, polish, distill and 20 more commands. Its useful rules are already distilled in the harness's AI-look register. Note: its detector downloads a binary on first use.",
+      "description": "Paul Bakaus's Impeccable 4.8.2: commands you run on a narrow target (critique, audit, polish, bolder, quieter, typeset, layout, animate and more), a detector with 62 rules and no model behind it, and a hook that leaves notes after UI edits and never blocks. Its engine binary downloads on first use and is checked against pinned checksums. Keep its live mode off: it can start claude with permissions bypassed.",
       "category": "design"
     },
     {
