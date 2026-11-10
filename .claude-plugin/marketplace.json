@@ -64,17 +64,6 @@
       ],
       "description": "Benji Taylor's Stageshow (MIT): faux product UI, as stills or short animations, built against gold examples and filmed frame by frame to catch one-frame jumps and text that does not fit. For case-study stills and films and product heroes. Filming needs playwright-core in the project and Chrome, or CHROME_PATH set to another Chromium (Brave).",
       "category": "design"
-    },
-    {
-      "name": "design-harness",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/gonzalotheomelette/design-harness.git",
-        "path": "plugins/design-harness",
-        "sha": "5aa2c9e2cc405faa9cca75382b5d35ba63445c0e"
-      },
-      "description": "Omelette's own design harness, retired Nov 9 2026 and kept at its v0.19.0 tag: a review-before-show hook, a fresh-context reviewer, an art-direction critic and nine skills. Listed only so a project can switch it on for a test; nothing enables it by default.",
-      "category": "design"
     }
   ]
 }
