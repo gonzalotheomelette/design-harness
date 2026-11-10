@@ -40,12 +40,33 @@ Then, in each project's folder, install what it uses (local scope keeps it to th
 ```bash
 claude plugin install frontend-design@omelette --scope local
 claude plugin install impeccable@omelette --scope local
+claude plugin install modern-web-guidance@omelette --scope local
+claude plugin install emil-design-engineering@omelette --scope local
 claude plugin install stageshow@omelette --scope local
 ```
 
 `install.sh` links `~/.claude/CLAUDE.md` to the clone, so the clone has to stay where it is. Stageshow's filming
-needs `playwright-core` in the project (`npm i -D playwright-core`) and Chrome, or `CHROME_PATH` set to another
-Chromium.
+needs `playwright-core` installed in Stageshow's own folder, since it loads it from there (`npm i --no-save
+playwright-core` in that folder), and Chrome, or `CHROME_PATH` set to another Chromium. It films Stageshow's own
+stages, not arbitrary page elements.
+
+## Start a new product
+
+Every client product starts with no context. In its folder, after installing the plugins above:
+
+1. **`/impeccable init`.** It scans the project, then interviews you about the product: who uses it, in what
+   situation, what job they do, what makes it different, what real evidence exists. It writes `PRODUCT.md` from
+   your answers only, and marks anything undecided rather than inventing it. It never asks about looks.
+2. **The first surface.** Ask for it, or run `/impeccable shape <surface>` to agree a brief before any code. This is
+   where the look is settled: references from the top of the field, one at a time, yes or no, and Impeccable's
+   new-work step, which can start from a generated image when image generation is available. It writes
+   `DESIGN.md`.
+3. **Refine on narrow targets** with `critique`, `polish`, `bolder`, `quieter`, `typeset`, `layout`, `animate`.
+   For product-UI stills and animations, ask for them and Stageshow takes over.
+
+Commit `PRODUCT.md`, `DESIGN.md` and `.impeccable/config.json`; `.impeccable/config.local.json` stays on the machine.
+Checked on Nov 10 2026 in an empty project: the plugins install with the commands above, Impeccable reports that
+`init` is required, and `/impeccable doctor` finds no drift.
 
 ## Updating a pin
 
