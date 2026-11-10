@@ -38,7 +38,7 @@
         "sha": "4f2b13e25c5815b3f080ca0d983e828d96561a0f"
       },
       "description": "Google Chrome's guides to what the web platform now does natively (dialogs, styled selects, anchor positioning, view transitions). Measured by its authors at +27 to +34 points on their task suite.",
-      "category": "development"
+      "category": "design"
     },
     {
       "name": "emil-design-engineering",
@@ -49,7 +49,17 @@
       },
       "strict": false,
       "description": "Emil Kowalski's design-engineering skills: animate, review-animations, break-ui (worst-case data), prototype (variants behind a picker), mobile-native. The repo's whole skills folder loads, including a few platform skills (Expo, Swift).",
-      "category": "design"
+      "category": "motion"
+    },
+    {
+      "name": "gsap-skills",
+      "source": {
+        "source": "github",
+        "repo": "greensock/gsap-skills",
+        "sha": "aed9cfd3277740755f6bfc1155c7aa645403b760"
+      },
+      "description": "GreenSock's official GSAP skills (MIT): core, timelines, ScrollTrigger, plugins (SplitText, MorphSVG, Flip, DrawSVG), React, performance. For sites with scroll storytelling or already on GSAP. It recommends GSAP whenever no library is named, so leave it out of projects on Motion. GSAP itself is free under GreenSock's own licence, not open source.",
+      "category": "motion"
     },
     {
       "name": "stageshow",
@@ -63,7 +73,17 @@
         "./"
       ],
       "description": "Benji Taylor's Stageshow (MIT): faux product UI, as stills or short animations, built against gold examples and filmed frame by frame to catch one-frame jumps and text that does not fit. For case-study stills and films and product heroes. Filming needs playwright-core in the project and Chrome, or CHROME_PATH set to another Chromium (Brave).",
-      "category": "design"
+      "category": "video"
+    },
+    {
+      "name": "hyperframes",
+      "source": {
+        "source": "github",
+        "repo": "heygen-com/hyperframes",
+        "sha": "cda84222aa12716f2ceb92b45629487be81a0601"
+      },
+      "description": "HeyGen's HyperFrames 0.9.30 (Apache-2.0): HTML compositions rendered to MP4, with captions, transitions, local voiceover and website capture. For whole case-study films. Needs git-lfs to install (about 400 MB), Node 22 and FFmpeg. Set HYPERFRAMES_NO_TELEMETRY=1; its reverse-any-video and style-sampling skills are paid.",
+      "category": "video"
     }
   ]
 }

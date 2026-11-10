@@ -3,14 +3,31 @@
 How Omelette designs with Claude Code: a few outside design plugins, each pinned to a commit that was read and
 checked, and the working rules every session starts with. Nothing here gates or grades the work. The designer steers.
 
+Three shelves. Design goes in every product; Motion and Video go in only where the work needs them.
+
+**Design**
+
 | Piece | What it does | Pinned |
 |---|---|---|
 | [frontend-design](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/frontend-design) (Anthropic) | Commits to an aesthetic direction and a real type pairing before any code | `a7ba5b9` |
 | [Impeccable](https://github.com/pbakaus/impeccable) (Paul Bakaus) | Commands run on a narrow target: `/impeccable critique the pricing cards`, `audit`, `polish`, `bolder`, `quieter`, `typeset`, `layout`, `animate`. A detector with 62 rules and no model behind it. A hook that leaves notes after UI edits and never blocks | 4.8.2, `4ae73c5` |
-| [Stageshow](https://github.com/benjitaylor/skills/tree/main/stageshow) (Benji Taylor) | Faux product UI as stills or short animations, filmed frame by frame to catch jumps and text that does not fit. For case imagery and product heroes | 1.1.1, `299140f` |
 | [modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) (Google Chrome) | What the web platform now does natively | `4f2b13e` |
-| [Emil Kowalski's skills](https://github.com/emilkowalski/skills) | Animation and interaction craft | `a81dbca` |
-| `dotfiles/CLAUDE.md` | The working rules every session on this machine starts with | |
+
+**Motion**
+
+| Piece | What it does | Pinned |
+|---|---|---|
+| [Emil Kowalski's skills](https://github.com/emilkowalski/skills) | Animation and interaction craft for product UI | `a81dbca` |
+| [GSAP skills](https://github.com/greensock/gsap-skills) (GreenSock) | Timelines, ScrollTrigger (pin, scrub), SplitText, MorphSVG, Flip, with React cleanup. Only for sites with scroll storytelling or already on GSAP: it recommends GSAP whenever no library is named, so in a project on Motion it competes with Emil's skills | 1.0.0, `aed9cfd` |
+
+**Video**, for Omelette's own case studies
+
+| Piece | What it does | Pinned |
+|---|---|---|
+| [Stageshow](https://github.com/benjitaylor/skills/tree/main/stageshow) (Benji Taylor) | Faux product UI as stills or short animations, filmed frame by frame to catch jumps and text that does not fit. For case imagery and product heroes | 1.1.1, `299140f` |
+| [HyperFrames](https://github.com/heygen-com/hyperframes) (HeyGen) | HTML in, MP4 out: whole case-study films with titles, captions, transitions and local voiceover, and `capture <url>` to bring a live site in as an editable scene | 0.9.30, `cda8422` |
+
+`dotfiles/CLAUDE.md` holds the working rules every session on this machine starts with.
 
 ## How work runs
 
@@ -42,8 +59,21 @@ claude plugin install frontend-design@omelette --scope local
 claude plugin install impeccable@omelette --scope local
 claude plugin install modern-web-guidance@omelette --scope local
 claude plugin install emil-design-engineering@omelette --scope local
-claude plugin install stageshow@omelette --scope local
 ```
+
+Only where the work needs them:
+
+```bash
+claude plugin install gsap-skills@omelette --scope local
+claude plugin install stageshow@omelette --scope local
+claude plugin install hyperframes@omelette --scope local
+```
+
+HyperFrames keeps its test media in Git LFS, so its install fails on a machine without `git-lfs` and pulls about
+400 MB on one with it. It needs Node 22, FFmpeg and a Chrome it downloads itself. Its skills send a usage beacon and
+ask for a rating after each render: set `HYPERFRAMES_NO_TELEMETRY=1` in the project's `.claude/settings.local.json`
+`env`. Its `media-use` skill offers a HeyGen sign-in first; the local voice and transcription it falls back to are
+free. `reverse-any-video` and `style-sampling` are paid and unused.
 
 `install.sh` links `~/.claude/CLAUDE.md` to the clone, so the clone has to stay where it is. Stageshow's filming
 needs `playwright-core` installed in Stageshow's own folder, since it loads it from there (`npm i --no-save
