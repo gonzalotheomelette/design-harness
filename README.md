@@ -1,5 +1,12 @@
 # Design harness
 
+> **Retired, Nov 9 2026.** Omelette no longer uses this harness. A full day of runs on the Omelette site showed its
+> checks working (line breaks, layout, accessibility, copy) and its taste side failing: every direction it produced was
+> turned down, and a rebuild that removed its rules drifted into another brand's look. Omelette's design work now runs
+> on Anthropic's [frontend-design](https://github.com/anthropics/claude-plugins-official) skill and
+> [Impeccable](https://github.com/pbakaus/impeccable), steered by the designer on narrow targets. The code stays here as
+> it was at v0.19.0, unmaintained.
+
 Omelette's starting point for every new product. The look is new for every client; the method is the same
 everywhere: a design decision written down once is enforced on every change after it, and a turn that changed the
 interface does not end until a fresh reviewer has compared that change with what already exists. Fixes the session
