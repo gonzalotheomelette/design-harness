@@ -41,6 +41,21 @@
       "category": "design"
     },
     {
+      "name": "references",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/mengto/skills.git",
+        "path": "agent-skills/codex",
+        "sha": "07274a3b3dba5f6a311186ddaf65765d94f78cec"
+      },
+      "skills": [
+        "./video-to-superprompt",
+        "./audit-reference-originality"
+      ],
+      "description": "Two of Meng To's skills (MIT) for working from references: video-to-superprompt turns a screen recording into a section-by-section build prompt (needs ffmpeg), and audit-reference-originality compares a build with its references for copied text, files, numbers, imagery and motion, each red flag citing both sides, with a read-only inventory script.",
+      "category": "design"
+    },
+    {
       "name": "emil-design-engineering",
       "source": {
         "source": "github",
@@ -60,6 +75,54 @@
       },
       "description": "GreenSock's official GSAP skills (MIT): core, timelines, ScrollTrigger, plugins (SplitText, MorphSVG, Flip, DrawSVG), React, performance. For sites with scroll storytelling or already on GSAP. It recommends GSAP whenever no library is named, so leave it out of projects on Motion. GSAP itself is free under GreenSock's own licence, not open source.",
       "category": "motion"
+    },
+    {
+      "name": "motion-techniques",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/mengto/skills.git",
+        "path": "agent-skills",
+        "sha": "07274a3b3dba5f6a311186ddaf65765d94f78cec"
+      },
+      "skills": [
+        "./web-design/masked-reveal",
+        "./web-design/scroll-progress-timeline",
+        "./web-design/scroll-scrubbed-word-reveal",
+        "./web-design/scroll-scrubbed-visual-sequence",
+        "./web-design/horizontal-scroll-scenes",
+        "./web-design/progressive-blur",
+        "./web-design/reveal-hover-effect",
+        "./codex/optimize-web-animations"
+      ],
+      "description": "Eight of Meng To's motion skills (MIT), each one effect rather than a look: masked word reveals, a scroll progress timeline, scroll-scrubbed word reveals and visual sequences, horizontal scroll scenes, progressive blur, a cursor reveal between two images, and a pass that pauses offscreen animation and finds leaks. Each covers reduced motion and cleanup. The download is Meng's whole skills folder, about 135 MB, since these sit in two of its folders.",
+      "category": "motion"
+    },
+    {
+      "name": "illustration",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/mengto/skills.git",
+        "path": "agent-skills/illustration",
+        "sha": "07274a3b3dba5f6a311186ddaf65765d94f78cec"
+      },
+      "skills": [
+        "./illustration-flat",
+        "./illustration-outlined-cartoon",
+        "./illustration-bold-pop",
+        "./illustration-line-interior",
+        "./illustration-flat-with-black",
+        "./illustration-framed-panel",
+        "./illustration-grainy-gouache",
+        "./illustration-ink-sketch",
+        "./illustration-vintage-emblem",
+        "./illustration-halftone-line",
+        "./illustration-one-line",
+        "./illustration-isometric-mono",
+        "./illustration-teal-spot",
+        "./illustration-two-colour-brush"
+      ],
+      "description": "Meng To's illustration skills (MIT): 14 styles of hand-written SVG spot illustration (flat, outlined cartoon, bold pop, line interior, ink sketch, halftone, one-line, isometric, vintage emblem and more), each with three example cards, a measured palette, a parts kit and a render-and-lint loop. For empty states, onboarding, error pages and feature spots. One style per product; each keeps its own palette. Kits and lint run on plain Node; rendering needs playwright-core and CHROME_PATH set to Brave.",
+      "category": "illustration"
     },
     {
       "name": "stageshow",

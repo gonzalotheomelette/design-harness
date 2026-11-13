@@ -3,7 +3,7 @@
 This repository copies no third-party code. The marketplace lists frontend-design
 (anthropics/claude-plugins-official), Impeccable (pbakaus/impeccable, Apache-2.0), modern-web-guidance (GoogleChrome,
 Apache-2.0), emilkowalski/skills (MIT), GSAP skills (greensock/gsap-skills, MIT; GSAP itself is under GreenSock's own
-no-charge licence), Stageshow (benjitaylor/skills, `stageshow/` MIT) and HyperFrames (heygen-com/hyperframes,
+no-charge licence), Meng To's illustration, reference and motion skills (mengto/skills, MIT), Stageshow (benjitaylor/skills, `stageshow/` MIT) and HyperFrames (heygen-com/hyperframes,
 Apache-2.0). Each installs from its own
 repository at the commit pinned in `.claude-plugin/marketplace.json`.
 
