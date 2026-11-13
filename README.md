@@ -3,7 +3,7 @@
 How Omelette designs with Claude Code: a few outside design plugins, each pinned to a commit that was read and
 checked, and the working rules every session starts with. Nothing here gates or grades the work. The designer steers.
 
-Three shelves. Design goes in every product; Motion and Video go in only where the work needs them.
+Four shelves. Design goes in every product; Motion, Illustration and Video go in only where the work needs them.
 
 **Design**
 
@@ -12,6 +12,7 @@ Three shelves. Design goes in every product; Motion and Video go in only where t
 | [frontend-design](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/frontend-design) (Anthropic) | Commits to an aesthetic direction and a real type pairing before any code | `a7ba5b9` |
 | [Impeccable](https://github.com/pbakaus/impeccable) (Paul Bakaus) | Commands run on a narrow target: `/impeccable critique the pricing cards`, `audit`, `polish`, `bolder`, `quieter`, `typeset`, `layout`, `animate`. A detector with 62 rules and no model behind it. A hook that leaves notes after UI edits and never blocks | 4.8.2, `4ae73c5` |
 | [modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) (Google Chrome) | What the web platform now does natively | `4f2b13e` |
+| [References](https://github.com/mengto/skills/tree/main/agent-skills/codex) (Meng To) | `video-to-superprompt` turns a screen recording of a reference into a section-by-section build prompt. `audit-reference-originality` compares the build with its references and flags copied text, files, numbers, imagery and motion, citing both sides | `07274a3` |
 
 **Motion**
 
@@ -19,6 +20,13 @@ Three shelves. Design goes in every product; Motion and Video go in only where t
 |---|---|---|
 | [Emil Kowalski's skills](https://github.com/emilkowalski/skills) | Animation and interaction craft for product UI | `a81dbca` |
 | [GSAP skills](https://github.com/greensock/gsap-skills) (GreenSock) | Timelines, ScrollTrigger (pin, scrub), SplitText, MorphSVG, Flip, with React cleanup. Only for sites with scroll storytelling or already on GSAP: it recommends GSAP whenever no library is named, so in a project on Motion it competes with Emil's skills | 1.0.0, `aed9cfd` |
+| [Motion techniques](https://github.com/mengto/skills/tree/main/agent-skills/web-design) (Meng To) | One effect each: masked word reveals, a scroll progress timeline, scroll-scrubbed words and visual sequences, horizontal scroll scenes, progressive blur, a cursor reveal between two images, and a pass that pauses offscreen animation and finds leaks | `07274a3` |
+
+**Illustration**
+
+| Piece | What it does | Pinned |
+|---|---|---|
+| [Illustration skills](https://github.com/mengto/skills/tree/main/agent-skills/illustration) (Meng To) | 14 styles of spot illustration drawn as SVG, from flat and outlined cartoon to halftone, one-line, isometric and vintage emblem. Each style has three example cards, a measured palette, a parts kit and a render-and-lint loop. One style per product, in that style's own palette | `07274a3` |
 
 **Video**, for Omelette's own case studies
 
@@ -58,6 +66,7 @@ Then, in each project's folder, install what it uses (local scope keeps it to th
 claude plugin install frontend-design@omelette --scope local
 claude plugin install impeccable@omelette --scope local
 claude plugin install modern-web-guidance@omelette --scope local
+claude plugin install references@omelette --scope local
 claude plugin install emil-design-engineering@omelette --scope local
 ```
 
@@ -65,6 +74,8 @@ Only where the work needs them:
 
 ```bash
 claude plugin install gsap-skills@omelette --scope local
+claude plugin install motion-techniques@omelette --scope local
+claude plugin install illustration@omelette --scope local
 claude plugin install stageshow@omelette --scope local
 claude plugin install hyperframes@omelette --scope local
 ```
@@ -78,7 +89,10 @@ free. `reverse-any-video` and `style-sampling` are paid and unused.
 `install.sh` links `~/.claude/CLAUDE.md` to the clone, so the clone has to stay where it is. Stageshow's filming
 needs `playwright-core` installed in Stageshow's own folder, since it loads it from there (`npm i --no-save
 playwright-core` in that folder), and Chrome, or `CHROME_PATH` set to another Chromium. It films Stageshow's own
-stages, not arbitrary page elements.
+stages, not arbitrary page elements. The illustration skills' kits and lint run on plain Node; their `render.mjs`
+needs `playwright-core` the same way (in the skill's folder, the current folder or globally) and `CHROME_PATH` set to
+Brave. `video-to-superprompt` needs FFmpeg. `motion-techniques` downloads Meng's whole skills folder, about 135 MB,
+since its eight skills sit in two of its folders.
 
 ## Start a new product
 
