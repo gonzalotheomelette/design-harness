@@ -15,7 +15,9 @@ one gets applied too narrowly or too broadly.
 - **Label anything you invented** to fill a gap in a brief (field values, lists, placement), everywhere it appears.
   Unlabelled invention reads as a client decision and gets built.
 - **Drafts I post as myself** (comments in client docs, Slack) are in the first person singular: "I", never "we".
-- **Show work as live URLs**, not batches of screenshots; I cannot tell which image is which.
+- **Show work as live URLs**, sketches included, not batches of screenshots; I cannot tell which image is which.
+- **Anything I choose from speaks product, not skill.** A card says what the layout is and what it is good and bad
+  at, never a skill's own words ("the roll", "dealt", "challenger"); I cannot choose what I cannot read.
 
 ## Writing
 
@@ -49,7 +51,11 @@ one gets applied too narrowly or too broadly.
   A new pattern is fine when it would pay off elsewhere too.
 - **Never a modal on a modal.** An act started inside a dialog becomes a face of that dialog, with Back.
 - **Long choices are a select with the picked option's detail under it**, not seven choice cards.
-- **New charts and illustrations need references first.** Options generated from your own defaults read as slop.
+- **New surfaces, charts and illustrations start from references**, because options from your own defaults read as
+  slop. Before any layout: write the job, how often it is done and its states in plain words; show me real references
+  for that job one at a time for a yes or no (the project's references doc, else Mobbin's `search_screens` and
+  `search_flows`); only then let `/impeccable shape` deal layouts, built from the yeses. When I steer away from what
+  you showed, go back to references, never to layouts you draw yourself.
 - **Rich text runs on a library** (Tiptap), never a hand-rolled contentEditable.
 - **Look at what the change produced**: most of my corrections are second-order effects in the region beside the
   one you meant to change.
