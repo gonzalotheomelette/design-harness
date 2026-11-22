@@ -35,12 +35,26 @@ Four shelves. Design goes in every product; Motion, Illustration and Video go in
 | [Stageshow](https://github.com/benjitaylor/skills/tree/main/stageshow) (Benji Taylor) | Faux product UI as stills or short animations, filmed frame by frame to catch jumps and text that does not fit. For case imagery and product heroes | 1.1.1, `299140f` |
 | [HyperFrames](https://github.com/heygen-com/hyperframes) (HeyGen) | HTML in, MP4 out: whole case-study films with titles, captions, transitions and local voiceover, and `capture <url>` to bring a live site in as an editable scene | 0.9.30, `cda8422` |
 
+References are gathered with [Mobbin](https://mobbin.com)'s MCP (`search_screens`, `search_flows`), added once per
+machine with `claude mcp add --transport http --scope user mobbin https://api.mobbin.com/mcp` and a Mobbin sign-in.
+
 `dotfiles/CLAUDE.md` holds the working rules every session on this machine starts with.
 
 ## How work runs
 
-- **References first.** For anything new, real references from the top of the field, shown one at a time for a yes or
-  no. Build from the yeses and show the result beside its reference. Never invent a new visual language without asking.
+- **References first, as a step.** No plugin here carries it out, so the session does, in this order, for every new
+  surface (a first one or one inside an established look):
+  1. Write the surface's job, how often it is done, and its states (empty, typical, busiest, error), in plain words.
+  2. Gather real references for that job and show them one at a time for a yes or no: the project's own references
+     doc when it covers the job, otherwise Mobbin.
+  3. Only then run `/impeccable shape`, and build the layouts it deals from the yeses. Impeccable's surface round
+     otherwise lists layouts from the model's own knowledge.
+
+  When the designer steers away from what was shown, go back to step 2, never to hand-drawn alternates. Show the
+  result beside its reference. Never invent a new visual language without asking.
+- **Plain product language at every decision.** A choice says what each option is and what it is good and bad at,
+  never a skill's vocabulary ("the roll", "dealt", challengers). Sketches go out as live URLs, checked to render in
+  the browser they are opened in.
 - **Steer on narrow targets.** One section or component at a time, with an Impeccable command, never a whole page at once.
 - **Checks catch slips, not taste.** Impeccable's detector and its hook flag contrast, overflow, legibility and the
   common AI looks. Whether the work is good is the designer's call.
@@ -101,10 +115,10 @@ Every client product starts with no context. In its folder, after installing the
 1. **`/impeccable init`.** It scans the project, then interviews you about the product: who uses it, in what
    situation, what job they do, what makes it different, what real evidence exists. It writes `PRODUCT.md` from
    your answers only, and marks anything undecided rather than inventing it. It never asks about looks.
-2. **The first surface.** Ask for it, or run `/impeccable shape <surface>` to agree a brief before any code. This is
-   where the look is settled: references from the top of the field, one at a time, yes or no, and Impeccable's
-   new-work step, which can start from a generated image when image generation is available. It writes
-   `DESIGN.md`.
+2. **The first surface.** Run the references step under "How work runs" first, then `/impeccable shape <surface>`
+   to agree a brief before any code. This is where the look is settled, through Impeccable's new-work step, which
+   can start from a generated image when image generation is available. It writes `DESIGN.md`. Every later new
+   surface takes the same references step before its `shape`.
 3. **Refine on narrow targets** with `critique`, `polish`, `bolder`, `quieter`, `typeset`, `layout`, `animate`.
    For product-UI stills and animations, ask for them and Stageshow takes over.
 
